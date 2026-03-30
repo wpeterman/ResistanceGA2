@@ -5,3 +5,5 @@
 inst/doc
 .Rcheck/
 .claude/
+vignettes/*.html
+*.tar.gz

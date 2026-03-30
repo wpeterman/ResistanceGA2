@@ -47,9 +47,9 @@ GA.prep(ASCII.dir,
                quiet = FALSE)
 }
 \arguments{
-\item{ASCII.dir}{Directory containing all raster objects to optimized. If optimizing using least cost paths, a RasterStack or RasterLayer object can be specified.}
+\item{ASCII.dir}{Directory containing \code{.asc} raster files, or a \code{SpatRaster} (from \pkg{terra}) with one or more layers.}
 
-\item{Results.dir}{If a RasterStack is provided in place of a directory containing .asc files for ASCII.dir, then a directory to export optimization results must be specified. It is critical that there are NO SPACES in the directory, as this will cause the function to fail. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as "all_comb".}
+\item{Results.dir}{Directory to export optimization results. If the directory does not exist, you will be prompted to create it (or it will be created automatically in non-interactive sessions). If it exists and is not empty, a message will note that existing results may be overwritten. It is critical that there are NO SPACES in the directory path. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as \code{"all_comb"}.}
 
 \item{min.cat}{The minimum value to be assessed during optimization of categorical resistance surfaces (Default = 1 / max.cat)}
 

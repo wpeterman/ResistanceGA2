@@ -12,7 +12,7 @@ vignette: |
 ---
 
 ## Description
-One of the greatest limitations of using `ResistancaGA` for landscape resistance optimization is computation time. This time increases as the number of samples in space increases and/or the dimensions of the raster surface increase. Recently, [CIRCUITSCAPE](https://circuitscape.org/ "Link to CIRCUITSCAPE") was re-written in the [Julia computing language](https://julialang.org/ "Julia Homepage"). This implementation can be 4–10x faster than the original CIRCUITSCAPE, which is implemented in Python. This short document details the steps needed to use CIRCUITSCAPE in Julia when optimizing with `ResistanceGA` 
+One of the greatest limitations of using `ResistancaGA` for landscape resistance optimization is computation time. This time increases as the number of samples in space increases and/or the dimensions of the raster surface increase. Recently, [CIRCUITSCAPE](https://circuitscape.org/ "Link to CIRCUITSCAPE") was re-written in the [Julia computing language](https://julialang.org/ "Julia Homepage"). This short document details the steps needed to use CIRCUITSCAPE in Julia when optimizing with `ResistanceGA` 
 
 ## Download and Installation
  * First, you need to [download Julia](https://julialang.org/downloads/ "Julia Download")  
@@ -23,9 +23,9 @@ One of the greatest limitations of using `ResistancaGA` for landscape resistance
  Pkg.test("Circuitscape")
  ```
  
- * Next, install the latest version of `ResistanceGA`  
+ * Next, install the latest version of `ResistanceGA2`  
 ```{r Rga install, eval=FALSE}
-devtools::install_github("wpeterman/ResistanceGA", build_vignettes = TRUE)
+devtools::install_github("wpeterman/ResistanceGA2", build_vignettes = TRUE)
 ```
 
 ## Optimizing with Julia
@@ -34,7 +34,7 @@ For the most part, optimizing with Julia is very similar to using `Circuitscape`
 library(ResistanceGA2)
 
 ## Sample locations
-sp.dat <- sample_pops$sample_cont 
+sp.dat <- vect(sample_pops$sample_cont)
 
 ## Continuous landscape surface
 cont.rast <- raster_orig$cont_orig
@@ -50,17 +50,9 @@ Next prepare the GA and Julia inputs. You need to specify the full path to the J
 ```{r load julia, eval=FALSE}
 ## Specify path the to `bin` directory
 ## This path may vary depending upon Julia version or operating system
-JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia 1.5.2/bin/"
-JuliaCall::julia_setup(JULIA_HOME)
+JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia-1.11.4/bin/"
 ```
 
-If you get this error:  
-```
-Error: Error happens in Julia.
-InitError: could not load library "libdSFMT"
-The specified module could not be found.
-```
-re-run the `jl.prep` function. This should only occur once, if at all. 
 
 Next run the preparation functions.
 ```{r prep function, eval = FALSE}

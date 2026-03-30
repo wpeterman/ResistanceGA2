@@ -2,8 +2,8 @@
 #'
 #' This function prepares and compiles objects and commands for optimization with the GA package
 #'
-#' @param ASCII.dir Directory containing all raster objects to optimized. If optimizing using least cost paths, a RasterStack or RasterLayer object can be specified.
-#' @param Results.dir If a RasterStack is provided in place of a directory containing .asc files for ASCII.dir, then a directory to export optimization results must be specified. It is critical that there are NO SPACES in the directory, as this will cause the function to fail. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as "all_comb".
+#' @param ASCII.dir Directory containing \code{.asc} raster files, or a \code{SpatRaster} (from \pkg{terra}) with one or more layers.
+#' @param Results.dir Directory to export optimization results. If the directory does not exist, you will be prompted to create it (or it will be created automatically in non-interactive sessions). If it exists and is not empty, a message will note that existing results may be overwritten. It is critical that there are NO SPACES in the directory path. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as \code{"all_comb"}.
 #' @param min.cat The minimum value to be assessed during optimization of categorical resistance surfaces (Default = 1 / max.cat)
 #' @param max.cat The maximum value to be assessed during optimization of categorical resistance surfaces (Default = 1000)
 #' @param max.cont The maximum value to be assessed during optimization of continuous resistance surfaces (Default = 1000)
@@ -230,13 +230,33 @@ GA.prep <- function(ASCII.dir,
       "'Results.dir' was not specified. Results will be exported to ",
       getwd()
     ))
-    Results.dir <- paste0(getwd(),"\\")
+    Results.dir <- paste0(getwd(), "/")
   }
-  
+
   if ((Results.dir != 'all.comb') & (Results.dir != 'all_comb')) {
-    TEST.dir <- !file_test("-d", Results.dir)
-    if (TEST.dir == TRUE) {
-      stop("The specified 'Results.dir' does not exist")
+    if (!dir.exists(Results.dir)) {
+      if (interactive()) {
+        ans <- utils::menu(
+          choices = c("Yes", "No"),
+          title   = paste0("'Results.dir' does not exist:\n  ",
+                           Results.dir,
+                           "\nCreate it?")
+        )
+        if (ans == 1L) {
+          dir.create(Results.dir, recursive = TRUE)
+          message("Created directory: ", Results.dir)
+        } else {
+          stop("'Results.dir' does not exist and was not created.")
+        }
+      } else {
+        dir.create(Results.dir, recursive = TRUE)
+        message("Created 'Results.dir': ", Results.dir)
+      }
+    } else {
+      existing <- list.files(Results.dir, all.files = FALSE, no.. = TRUE)
+      if (length(existing) > 0) {
+        message("NOTE: 'Results.dir' is not empty. Existing results may be overwritten.")
+      }
     }
   }
   
