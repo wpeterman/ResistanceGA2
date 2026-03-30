@@ -2,15 +2,22 @@
 #'
 #' This function prepares and compiles objects and commands for optimization with the GA package
 #'
-#' @param ASCII.dir Directory containing \code{.asc} raster files, or a \code{SpatRaster} (from \pkg{terra}) with one or more layers.
-#' @param Results.dir Directory to export optimization results. If the directory does not exist, you will be prompted to create it (or it will be created automatically in non-interactive sessions). If it exists and is not empty, a message will note that existing results may be overwritten. It is critical that there are NO SPACES in the directory path. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as \code{"all_comb"}.
+#' @param raster A \code{SpatRaster} (from \pkg{terra}) with one or more layers.
+#' @param Results.dir Directory to export optimization results. If the directory
+#'   does not exist, it will be created automatically. If it exists and is not
+#'   empty, a message will note that existing results may be overwritten. It is
+#'   critical that there are NO SPACES in the directory path. If using the
+#'   \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir}
+#'   as \code{"all_comb"}.
 #' @param min.cat The minimum value to be assessed during optimization of categorical resistance surfaces (Default = 1 / max.cat)
 #' @param max.cat The maximum value to be assessed during optimization of categorical resistance surfaces (Default = 1000)
 #' @param max.cont The maximum value to be assessed during optimization of continuous resistance surfaces (Default = 1000)
 #' @param shape.min The minimum value for the shape parameter used for transforming resistance surfaces. If unspecified, used 0.5
 #' @param shape.max The maximum value for the shape parameter used for transforming resistance surfaces. If unspecified, used 14.5
 #' @param cont.shape A vector of hypothesized relationships that each continuous resistance surface will have in relation to the genetic distance response (Default = NULL; see details)
-#' @param select.trans Option to specify which transformations are applied to continuous surfaces. Must be provided as a list. "A" = All, "M" = Monomolecular only, "R" = Ricker only. Default = "M"; see Details.
+#' @param select.trans Option to specify which transformations are applied to
+#'   continuous surfaces. Must be provided as a list. "A" = All, "M" =
+#'   Monomolecular only, "R" = Ricker only. Default = "M"; see Details.
 #' @param cat.levels Number of unique levels to permit in categorical surface (Default = 15). See Details
 #' @param method Objective function to be optimized. Select "AIC", "R2", or "LL" to optimize resistance surfaces based on AIC, variance explained (R2), or log-likelihood. (Default = "LL")
 #' @param k.value Specification of how k, the number of parameters in the mixed effects model, is determined. Specify 1, 2, 3, or 4 (Default = 2; see details).
@@ -53,13 +60,29 @@
 #' @param quiet Logical. If TRUE, the objective function and step run time will not be printed to the screen after each step. Only \code{ga} summary information will be printed following each iteration. (Default = FALSE)
 #' @return An R object that is a required input into optimization functions
 #'
-#' @details Only files that you wish to optimize, either in isolation or simultaneously, should be included in the specified \code{ASCII.dir}. If you wish to optimize different combinations of surfaces, different directories containing these surfaces must be created. It is preferable to provide a RasterStack.
+#' @details Provide the resistance surfaces directly as a \code{SpatRaster}. If
+#' multiple surfaces are to be optimized, include them as layers in that
+#' object. File-path and directory-based raster inputs are no longer accepted.
 #'
 #' The Default for \code{k.value} is 2, which sets k equal to the number of parameters optimized, plus 1 for the intercept term. Prior to version 3.0-0, \code{k.value} could not be specified by the user and followed setting 2, such that k was equal to the number of parameters optimized plus the intercept term.
 #'
 #' \code{cont.shape} can take values of "Increase", "Decrease", or "Peaked". If you believe a resistance surface is related to your response in a particular way, specifying this here may decrease the time to optimization. \code{cont.shape} is used to generate an initial set of parameter values to test during optimization. If specified, a greater proportion of the starting values will include your believed relationship. If unspecified (the Default), a completely random set of starting values will be generated.
 #'
-#' If it is desired that only certain transformations be assessed for continuous surfaces, then this can be specified using \code{select.trans}. By default, only monomolecular transformations will be assessed for continuous surfaces unless otherwise specified. Specific transformations can be specified by providing a vector of values (e.g., \code{c(1,3,5)}), with values corresponding to the equation numbers as detailed in \code{\link[ResistanceGA2]{Resistance.tran}}. If multiple rasters are to be optimized from the same directory, then a list of transformations must be provided in the order that the raster surfaces will be assessed. For example:\cr
+#' If it is desired that only certain transformations be assessed for
+#' continuous surfaces, then this can be specified using
+#' \code{select.trans}. By default, only monomolecular transformations
+#' will be assessed for continuous surfaces unless otherwise specified.
+#' This default is also the recommended starting point for most analyses:
+#' monomolecular families are usually easier to interpret and generally
+#' reduce the risk of overfitting relative to Ricker families. Ricker
+#' transformations should usually be explored only when there is a strong
+#' biological or ecological justification for a unimodal or quadratic-type
+#' relationship. Specific transformations can be specified by providing a
+#' vector of values (e.g., \code{c(1,3,5)}), with values corresponding to the
+#' equation numbers as detailed in \code{\link[ResistanceGA2]{Resistance.tran}}.
+#' If multiple rasters are to be optimized from the same \code{SpatRaster}
+#' object, then a list of transformations must be provided in the order that
+#' the raster surfaces will be assessed. For example:\cr
 #' \code{select.trans = list("M", "A", "R", c(5,6))}\cr
 #' will result in surface one only being optimized with Monomolecular transformations, surface two with all transformations, surface three with only Ricker transformations, and surface four with Reverse Ricker and Reverse Monomolecular only. If a categorical surface is among the rasters to be optimized, it is necessary to specify \code{NA} to accommodate this.
 #' 
@@ -71,7 +94,7 @@
 
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
-#' @usage GA.prep(ASCII.dir,
+#' @usage GA.prep(raster,
 #'                Results.dir = NULL,
 #'                min.cat = NULL,
 #'                max.cat = 1000,
@@ -113,13 +136,17 @@
 #'                monitor = TRUE,
 #'                quiet = FALSE)
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' ga.inputs <- GA.prep(
+#'   raster = raster_orig,
+#'   Results.dir = file.path(tempdir(), "ResistanceGA2-example"),
+#'   quiet = TRUE,
+#'   monitor = FALSE
+#' )
+#'
+#' ga.inputs$layer.names
 
-GA.prep <- function(ASCII.dir,
+GA.prep <- function(raster,
                     Results.dir = NULL,
                     min.cat = NULL,
                     max.cat = 1000,
@@ -235,29 +262,22 @@ GA.prep <- function(ASCII.dir,
 
   if ((Results.dir != 'all.comb') & (Results.dir != 'all_comb')) {
     if (!dir.exists(Results.dir)) {
-      if (interactive()) {
-        ans <- utils::menu(
-          choices = c("Yes", "No"),
-          title   = paste0("'Results.dir' does not exist:\n  ",
-                           Results.dir,
-                           "\nCreate it?")
-        )
-        if (ans == 1L) {
-          dir.create(Results.dir, recursive = TRUE)
-          message("Created directory: ", Results.dir)
-        } else {
-          stop("'Results.dir' does not exist and was not created.")
-        }
-      } else {
-        dir.create(Results.dir, recursive = TRUE)
-        message("Created 'Results.dir': ", Results.dir)
+      dir.create(Results.dir, recursive = TRUE, showWarnings = FALSE)
+      if (!dir.exists(Results.dir)) {
+        stop("Failed to create 'Results.dir': ", Results.dir)
       }
+      message("Created 'Results.dir': ", Results.dir)
     } else {
       existing <- list.files(Results.dir, all.files = FALSE, no.. = TRUE)
       if (length(existing) > 0) {
         message("NOTE: 'Results.dir' is not empty. Existing results may be overwritten.")
       }
     }
+
+    results_root <- paste0(
+      sub("[/\\\\]+$", "", normalizePath(Results.dir, winslash = "/", mustWork = FALSE)),
+      "/"
+    )
   }
   
   if(!is.null(select.trans)){
@@ -267,28 +287,14 @@ GA.prep <- function(ASCII.dir,
   }
   
   
-  if (inherits(ASCII.dir, "SpatRaster")) {
-    r <- ASCII.dir
-    names <- names(r)
-    n.layers <- terra::nlyr(r)
-  } else if (is.character(ASCII.dir) && length(ASCII.dir) == 1 && dir.exists(ASCII.dir)) {
-    ASCII.list <-
-      list.files(ASCII.dir, pattern = "*.asc", full.names = TRUE)
-    if (length(ASCII.list) == 0) {
-      stop("There are no .asc files in the specified 'ASCII.dir'")
-    }
-    r <- terra::rast(ASCII.list)
-    names <-
-      gsub(pattern = "*.asc", "", x = (list.files(ASCII.dir, pattern = "*.asc")))
-    n.layers <- terra::nlyr(r)
-  } else {
-    stop("'ASCII.dir' must be a SpatRaster object or a path to a directory containing .asc files")
-  }
+  r <- .validate_spatraster(raster, arg = "raster")
+  layer.names <- names(r)
+  n.layers <- terra::nlyr(r)
   
   if(Results.dir != 'all.comb' & Results.dir != 'all_comb') {
     if ("Results" %in% dir(Results.dir) == FALSE)
       dir.create(file.path(Results.dir, "Results"))
-    Results.DIR <- paste0(Results.dir, "Results/")
+    Results.DIR <- paste0(results_root, "Results/")
     
     # if ("tmp" %in% dir(Results.dir) == FALSE)
     #   dir.create(file.path(Results.dir, "tmp"))
@@ -321,7 +327,7 @@ GA.prep <- function(ASCII.dir,
       Level.val <- terra::unique(r[[i]])[[1]]
       parm.type[i, 1] <- "cat"
       parm.type[i, 2] <- n.levels
-      parm.type[i, 3] <- names[i]
+      parm.type[i, 3] <- layer.names[i]
       min.list[[i]] <- c(1, rep(min.cat, (n.levels - 1)))
       max.list[[i]] <- c(1, rep(max.cat, (n.levels - 1)))
       
@@ -333,7 +339,7 @@ GA.prep <- function(ASCII.dir,
       min.list[[i]] <- c(1, shape.min, 0.001)  # eq, shape, max
       max.list[[i]] <- c(9.99, shape.max, max.cont)
 
-      parm.type[i, 3] <- names[i]
+      parm.type[i, 3] <- layer.names[i]
       
       if (is.null(select.trans)) {
         eqs[[i]] <- eq.set("M")
@@ -392,12 +398,12 @@ GA.prep <- function(ASCII.dir,
       parm.type = parm.type,
       Resistance.stack = r,
       n.layers = n.layers,
-      layer.names = names,
+      layer.names = layer.names,
       pop.size = pop.size,
       min.list = min.list,
       max.list = max.list,
       SUGGESTS = SUGGESTS,
-      ASCII.dir = ASCII.dir,
+      raster = r,
       Results.dir = Results.DIR,
       Write.dir = Write.dir,
       Plots.dir = Plots.dir,
@@ -439,12 +445,12 @@ GA.prep <- function(ASCII.dir,
       parm.type = parm.type,
       Resistance.stack = r,
       n.layers = n.layers,
-      layer.names = names,
+      layer.names = layer.names,
       pop.size = pop.size,
       min.list = min.list,
       max.list = max.list,
       SUGGESTS = SUGGESTS,
-      ASCII.dir = ASCII.dir,
+      raster = r,
       Results.dir = Results.DIR,
       Write.dir = Write.dir,
       Plots.dir = Plots.dir,
@@ -476,7 +482,7 @@ GA.prep <- function(ASCII.dir,
       monitor = monitor,
       quiet = quiet,
       inputs = list(
-        ASCII.dir = ASCII.dir,
+        raster = r,
         Results.dir = Results.dir,
         min.cat = min.cat,
         max.cat = max.cat,

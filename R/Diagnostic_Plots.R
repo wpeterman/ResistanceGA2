@@ -3,7 +3,9 @@
 #'
 #' This function will generate mixed effect model diagnostic plots following optimization
 #'
-#' @param resistance.mat Path to CIRCUITSCAPE "_resistances.out" file, or costDistance object created from running gdistance
+#' @param resistance.mat Path to a Circuitscape resistance output file, or a
+#'   matrix/vector of pairwise resistance distances such as the output from
+#'   \code{\link{Run_gdistance}}.
 #' @param genetic.dist Vector of pairwise genetic distances (lower half of pairwise matrix). Can be accessed from \code{gdist.inputs$response} or \code{jl.inputs$response}
 #' @param XLAB Label for x-axis (Defaults to "Estimated resistance")
 #' @param YLAB Label for y-axis (Defaults to "Genetic distance")
@@ -18,11 +20,16 @@
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' @usage Diagnostic.Plots(resistance.mat, genetic.dist, XLAB,YLAB, plot.dir, type, name, ID, ZZ)
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' Diagnostic.Plots(
+#'   resistance.mat = resist_list[[1]],
+#'   genetic.dist = lower(Dc_list[[1]]),
+#'   plot.dir = paste0(normalizePath(tempdir(), winslash = "/"), "/"),
+#'   type = "categorical",
+#'   name = "example"
+#' )
+#' }
 Diagnostic.Plots <-
   function(resistance.mat,
            genetic.dist,

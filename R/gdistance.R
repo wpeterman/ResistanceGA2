@@ -6,10 +6,7 @@
 #' @param n.Pops The number of populations that are being assessed.
 #' @param response Vector of pairwise genetic distances (lower half of pairwise
 #'   matrix).
-#' @param samples Either the path to a tab-delimited .txt file containing xy
-#'   coordinates (columns 2 and 3, first column ignored), a two-column matrix
-#'   with x values in column 1 and y values in column 2, or a
-#'   \code{\link[terra]{SpatVector}} of points.
+#' @param samples A \code{\link[terra]{SpatVector}} of sample point locations.
 #' @param covariates Data frame of additional covariates to include in the MLPE
 #'   model during optimization.
 #' @param formula If covariates are included in the model, specify the R formula
@@ -38,23 +35,25 @@
 #'
 #' @return A named list of inputs required by the optimization functions.
 #'
+#' @details
+#' Sample locations must be supplied as a point \code{SpatVector}. When
+#' \code{\link{Run_gdistance}} is called, the resistance surface is converted
+#' internally to the raster class required by \pkg{gdistance}.
+#'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
-#' \dontrun{
-#' # Create sample data
-#' set.seed(42)
-#' coords <- matrix(runif(20, 0, 100), ncol = 2)
-#' gd <- runif(choose(10, 2))
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
 #'
 #' gdist.inputs <- gdist.prep(
-#'   n.Pops = 10,
-#'   response = gd,
-#'   samples = coords,
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = lower(Dc_list[[1]]),
+#'   samples = pts,
 #'   method = "commuteDistance"
 #' )
-#' }
+#'
+#' head(gdist.inputs$df)
 
 gdist.prep <-
   function(n.Pops,
@@ -88,24 +87,7 @@ gdist.prep <-
       stop("'response' and 'covariates' must have the same number of observations.")
     }
 
-    # Parse sample locations into a coordinate matrix -------------------------
-    if (is.matrix(samples)) {
-      if (ncol(samples) > 2) {
-        stop("The coordinate matrix has too many columns; supply x in column 1 and y in column 2.")
-      }
-      sp <- samples
-    } else if (inherits(samples, "SpatVector")) {
-      sp <- terra::crds(samples)
-    } else if (is.data.frame(samples)) {
-      sp <- as.matrix(samples)
-    } else if (is.character(samples)) {
-      if (!file.exists(samples)) {
-        stop("The path to the samples file does not exist: ", samples)
-      }
-      sp <- as.matrix(read.delim(samples, header = FALSE)[, -1])
-    } else {
-      stop("'samples' must be a coordinate matrix, data frame, SpatVector, or file path.")
-    }
+    sp <- .point_coords(samples, arg = "samples")
 
     if (n.Pops != nrow(sp)) {
       stop("'n.Pops' (", n.Pops, ") does not equal the number of sample locations (",

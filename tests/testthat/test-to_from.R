@@ -33,13 +33,18 @@ test_that("To.From.ID with pop_n returns individual-level data frame", {
 })
 
 test_that("To.From.ID stops when spLoc supplied without nb", {
-  spLoc <- cbind(c(1, 2, 9), c(1, 2, 9))
+  spLoc <- terra::vect(cbind(c(1, 2, 9), c(1, 2, 9)), type = "points")
   expect_error(To.From.ID(3, spLoc = spLoc), "nb")
 })
 
-test_that("To.From.ID accepts coordinate matrix for spLoc", {
-  spLoc <- cbind(c(1, 2, 9, 10), c(1, 2, 9, 10))
+test_that("To.From.ID accepts SpatVector for spLoc", {
+  spLoc <- terra::vect(cbind(c(1, 2, 9, 10), c(1, 2, 9, 10)), type = "points")
   id <- To.From.ID(4, spLoc = spLoc, nb = 3)
   expect_named(id, c("pop1", "pop2", "corr_", "cor.grp"))
   expect_equal(nrow(id), 6L)
+})
+
+test_that("To.From.ID errors on coordinate matrix for spLoc", {
+  spLoc <- cbind(c(1, 2, 9, 10), c(1, 2, 9, 10))
+  expect_error(To.From.ID(4, spLoc = spLoc, nb = 3), "SpatVector")
 })

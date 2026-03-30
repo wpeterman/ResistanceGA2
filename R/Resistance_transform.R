@@ -7,8 +7,7 @@
 #'   or the name of the transformation (see Details).
 #' @param shape Shape parameter value.
 #' @param max Maximum value parameter.
-#' @param r Resistance surface. Either a \code{SpatRaster} object or the path
-#'   to a raster file readable by \code{terra::rast()}.
+#' @param r Resistance surface as a single-layer \code{SpatRaster} object.
 #' @param out Directory path for exporting the transformed surface as an
 #'   \code{.asc} file. Default = \code{NULL} (no file written).
 #'
@@ -32,21 +31,24 @@
 #' Ricker function can approximate a monomolecular shape at high shape
 #' parameter values, whenever a shape parameter > 6 is selected with a Ricker
 #' family transformation, the transformation automatically reverts to Distance.
+#' In most optimization workflows, monomolecular families should be treated as
+#' the recommended default, and Ricker families should only be explored when
+#' there is strong biological or ecological support for a unimodal or
+#' quadratic-type relationship. Otherwise, the additional flexibility may
+#' increase the risk of overfitting.
 #'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
-#' \dontrun{
-#' library(terra)
-#' r <- rast(nrows = 50, ncols = 50, vals = runif(2500, 1, 10))
 #' r_trans <- Resistance.tran(
 #'   transformation = "Monomolecular",
-#'   shape = 0.5,
+#'   shape = 2.5,
 #'   max = 100,
-#'   r = r
+#'   r = raster_orig[["cont_orig"]]
 #' )
-#' }
+#'
+#' r_trans
 
 Resistance.tran <- function(transformation,
                             shape,
@@ -54,14 +56,8 @@ Resistance.tran <- function(transformation,
                             r,
                             out = NULL) {
 
-  if (!inherits(r, "SpatRaster")) {
-    NAME <- sub("^([^.]*).*", "\\1", basename(r))
-    R    <- terra::rast(r)
-    names(R) <- NAME
-  } else {
-    R    <- r
-    NAME <- names(r)
-  }
+  R <- .validate_spatraster(r, arg = "r", nlyr = 1L)
+  NAME <- names(R)
 
   if (is.numeric(transformation)) {
     parm <- c(transformation, shape, max)

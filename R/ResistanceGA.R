@@ -174,6 +174,39 @@ NULL
 #' @keywords datasets
 NULL
 
+#' Data file. Precomputed pairwise outputs used in vignette examples
+#'
+#' A named list containing lightweight, precomputed outputs from the current
+#' terra-based workflow.
+#'
+#' \itemize{
+#'   \item gdistance_commute. Full square commute-distance matrix returned by
+#'     \code{\link{Run_gdistance}} for
+#'     \code{resistance_surfaces[["continuous"]]} and \code{samples}.
+#'   \item circuitscape_matrix. Lower-half pairwise resistance vector returned
+#'     by \code{\link{Run_CS.jl}} for the same surface and sample locations.
+#' }
+#'
+#' @docType data
+#' @name vignette_pairwise_outputs
+#' @format A named list of length 2
+#' @usage data(vignette_pairwise_outputs)
+#' @keywords datasets
+NULL
+
+#' Data file. Precomputed Circuitscape current map used in vignette examples
+#'
+#' A \code{SpatRaster} cumulative current map produced by
+#' \code{\link{Run_CS.jl}} for \code{resistance_surfaces[["continuous"]]} and
+#' \code{samples}.
+#'
+#' @docType data
+#' @name vignette_current_map
+#' @format \code{SpatRaster} with 1 layer
+#' @usage data(vignette_current_map)
+#' @keywords datasets
+NULL
+
 #' Data file. Simulated resistance surfaces
 #'
 #' A \code{SpatRaster} with three layers for use in vignette examples.

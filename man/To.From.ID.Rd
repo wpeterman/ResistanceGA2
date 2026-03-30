@@ -18,9 +18,7 @@ of individuals sampled at each population. Only needed when converting
 from population- to individual-level analysis.}
 
 \item{spLoc}{Sample locations, used to add a spatial-proximity random effect.
-Accepts a two-column coordinate matrix (x, y), a
-\code{\link[terra]{SpatVector}} of points, or a path to a tab-delimited
-file (site, x, y) in Circuitscape format. Requires \code{nb}.}
+Provide a \code{\link[terra]{SpatVector}} of points. Requires \code{nb}.}
 
 \item{nb}{Maximum distance (in the same units as \code{spLoc}) below which
 locations are considered to be in the same neighborhood. Must be specified
@@ -50,8 +48,8 @@ To.From.ID(sampled_pops = 4, pop_n = c(1, 2, 3, 1))
 ## Expand pairwise distances
 To.From.ID(sampled_pops = 4, pop_n = c(1, 2, 3, 1), dist = runif(6))
 
-## Spatial-proximity random effect via coordinate matrix
-spLoc <- cbind(c(1, 2, 9, 10), c(1, 2, 9, 10))
+## Spatial-proximity random effect via SpatVector points
+spLoc <- terra::vect(cbind(c(1, 2, 9, 10), c(1, 2, 9, 10)), type = "points")
 To.From.ID(sampled_pops = 4, spLoc = spLoc, nb = 3)
 
 }

@@ -7,15 +7,15 @@
 #'
 #' @param jl.inputs Object from \code{\link{jl.prep}}. When provided, all other
 #'   Julia/CS settings are taken from this object.
-#' @param r A \code{SpatRaster} (from \pkg{terra}) or path to a raster file
-#'   readable by \code{terra::rast()}.
+#' @param r A single-layer \code{SpatRaster} (from \pkg{terra}).
 #' @param CurrentMap Logical. Generate the cumulative current map?
 #'   Default = \code{FALSE}.
 #' @param full.mat Logical. Return the full square distance matrix instead of
 #'   only the lower triangle? Default = \code{FALSE}. Cannot be requested when
 #'   \code{pairs_to_include} is used.
 #' @param EXPORT.dir Directory where Circuitscape results are written. Required
-#'   when \code{CurrentMap = TRUE}.
+#'   when \code{CurrentMap = TRUE}. If the directory does not exist, it will be
+#'   created automatically.
 #' @param output \code{"matrix"} (default) returns the lower-half pairwise
 #'   resistance vector; \code{"raster"} returns a \code{SpatRaster} of the
 #'   cumulative current map (requires \code{CurrentMap = TRUE}).
@@ -41,14 +41,25 @@
 #'   (\code{full.mat = TRUE}), or a \code{SpatRaster} current map
 #'   (\code{output = "raster"}).
 #'
+#' @details
+#' Users should supply terra objects directly. The raster and point files needed
+#' by Circuitscape are written to temporary files internally for each run.
+#'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
 #' \dontrun{
-#' library(terra)
-#' r         <- rast(nrows = 100, ncols = 100, vals = runif(1e4))
-#' cs.result <- Run_CS.jl(jl.inputs = jl.inputs, r = r)
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
+#' jl.inputs <- jl.prep(
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = lower(Dc_list[[1]]),
+#'   CS_Point.File = pts,
+#'   JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
+#'   run_test = FALSE
+#' )
+#'
+#' cs.result <- Run_CS.jl(jl.inputs = jl.inputs, r = raster_orig[["cont_orig"]])
 #' }
 Run_CS.jl <- function(jl.inputs        = NULL,
                       r,
@@ -92,6 +103,7 @@ Run_CS.jl <- function(jl.inputs        = NULL,
   }
 
   if (is.null(jl.inputs)) {
+    CS_Point.File <- .validate_spatvector_points(CS_Point.File, arg = "CS_Point.File")
     jl.inputs <- jl.prep(
       n.Pops           = nrow(CS_Point.File),
       CS_Point.File    = CS_Point.File,
@@ -119,15 +131,8 @@ Run_CS.jl <- function(jl.inputs        = NULL,
   JuliaConnectoR::juliaEval("using Circuitscape")
 
   # Load / validate raster ----------------------------------------------------
-  if (!inherits(r, "SpatRaster")) {
-    File.name <- sub("\\.(asc|tif|tiff)$", "", basename(r))
-    R         <- terra::rast(r)
-    names(R)  <- File.name
-    asc.dir   <- r
-  } else {
-    R       <- r
-    asc.dir <- NULL
-  }
+  R <- .validate_spatraster(r, arg = "r", nlyr = 1L)
+  asc.dir <- NULL
 
   # Export / temp directories -------------------------------------------------
   if (is.null(EXPORT.dir)) {
@@ -138,6 +143,18 @@ Run_CS.jl <- function(jl.inputs        = NULL,
     }
     if (!is.null(scratch)) {
       EXPORT.dir <- paste0(normalizePath(scratch), "/")
+    }
+  } else {
+    EXPORT.dir <- paste0(
+      sub("[/\\\\]+$", "", normalizePath(EXPORT.dir, winslash = "/", mustWork = FALSE)),
+      "/"
+    )
+    if (!dir.exists(EXPORT.dir)) {
+      dir.create(EXPORT.dir, recursive = TRUE, showWarnings = FALSE)
+      if (!dir.exists(EXPORT.dir)) {
+        stop("Failed to create 'EXPORT.dir': ", EXPORT.dir)
+      }
+      message("Created 'EXPORT.dir': ", EXPORT.dir)
     }
   }
 
@@ -210,19 +227,20 @@ Run_CS.jl <- function(jl.inputs        = NULL,
 
   # Execute Circuitscape.jl ---------------------------------------------------
   rt <- NULL
+  ini_path <- normalizePath(paste0(EXPORT.dir, tmp.name, ".ini"))
 
   if (!is.null(write.criteria)) {
     t1  <- proc.time()[3]
-    out <- JuliaConnectoR::juliaCall(
-      "compute",
-      normalizePath(paste0(EXPORT.dir, tmp.name, ".ini"))
-    )[-1, -1]
+    invisible(capture.output(
+      out <- JuliaConnectoR::juliaCall("compute", ini_path)[-1, -1],
+      type = "message"
+    ))
     rt  <- proc.time()[3] - t1
   } else {
-    out <- JuliaConnectoR::juliaCall(
-      "compute",
-      normalizePath(paste0(EXPORT.dir, tmp.name, ".ini"))
-    )[-1, -1]
+    invisible(capture.output(
+      out <- JuliaConnectoR::juliaCall("compute", ini_path)[-1, -1],
+      type = "message"
+    ))
   }
 
   # Return raster output ------------------------------------------------------

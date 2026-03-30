@@ -13,11 +13,31 @@
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
+#' gdist.inputs <- gdist.prep(
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = lower(Dc_list[[1]]),
+#'   samples = pts
+#' )
+#'
+#' GA.inputs <- GA.prep(
+#'   raster = raster_orig,
+#'   Results.dir = file.path(tempdir(), "ResistanceGA2-ms"),
+#'   pop.size = 20,
+#'   maxiter = 10,
+#'   run = 5,
+#'   quiet = TRUE,
+#'   monitor = FALSE
+#' )
+#'
+#' ms.out <- MS_optim(
+#'   gdist.inputs = gdist.inputs,
+#'   GA.inputs = GA.inputs,
+#'   diagnostic_plots = FALSE
+#' )
+#' }
 
 MS_optim <- function(gdist.inputs = NULL,
                      jl.inputs    = NULL,

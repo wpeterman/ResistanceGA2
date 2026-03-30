@@ -1,86 +1,219 @@
 ---
-title: "Using Julia with ResistanceGA"
+title: "Using Julia with ResistanceGA2"
 author: "Bill Peterman"
-date: "`r format(Sys.time(), '%d %B %Y')`"
-output:
-  html_document: rmarkdown::html_vignette
-  pdf_document: rmarkdown::pdf_document
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: rmarkdown::html_vignette
 vignette: |
-  %\VignetteIndexEntry{Using Julia with ResistanceGA} 
-  %\VignetteEngine{knitr::rmarkdown} 
+  %\VignetteIndexEntry{Using Julia with ResistanceGA2}
+  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-## Description
-One of the greatest limitations of using `ResistancaGA` for landscape resistance optimization is computation time. This time increases as the number of samples in space increases and/or the dimensions of the raster surface increase. Recently, [CIRCUITSCAPE](https://circuitscape.org/ "Link to CIRCUITSCAPE") was re-written in the [Julia computing language](https://julialang.org/ "Julia Homepage"). This short document details the steps needed to use CIRCUITSCAPE in Julia when optimizing with `ResistanceGA` 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
 
-## Download and Installation
- * First, you need to [download Julia](https://julialang.org/downloads/ "Julia Download")  
- * Following installation of Julia, follow [directions for installing the Circuitscape package](https://github.com/Circuitscape/Circuitscape.jl). In short, open the Julia command-line console, then type/paste the following:
- ```
- using Pkg
- Pkg.add("Circuitscape")
- Pkg.test("Circuitscape")
- ```
- 
- * Next, install the latest version of `ResistanceGA2`  
-```{r Rga install, eval=FALSE}
+```{r libraries, message=FALSE, warning=FALSE}
+library(ResistanceGA2)
+library(terra)
+```
+
+# Overview
+
+`ResistanceGA2` supports Circuitscape through Julia and `JuliaConnectoR`.
+
+- The standalone Circuitscape executable is no longer part of the supported workflow.
+- `JuliaCall` and `XRJulia` are not used.
+- Users still supply `terra` objects directly; temporary text, raster, and `.ini`
+  files are written internally only as needed for Circuitscape.
+
+This guide focuses on installing Julia, verifying the connection from R, and
+running the package’s Julia-backed workflow.
+
+# Install Julia and Circuitscape.jl
+
+1. Install Julia from <https://julialang.org/downloads/>.
+2. Open Julia and install Circuitscape:
+
+```julia
+using Pkg
+Pkg.add("Circuitscape")
+Pkg.test("Circuitscape")
+```
+
+3. Install `ResistanceGA2` from GitHub if needed:
+
+```{r install, eval=FALSE}
+install.packages("devtools")
 devtools::install_github("wpeterman/ResistanceGA2", build_vignettes = TRUE)
 ```
 
-## Optimizing with Julia
-For the most part, optimizing with Julia is very similar to using `Circuitscape` of `gdistance`. The development package has some example data sets that we can use for demonstration purposes.
-```{r Use Julia}
-library(ResistanceGA2)
+# Point R to Julia
 
-## Sample locations
-sp.dat <- vect(sample_pops$sample_cont)
+`jl.prep()` and `Run_CS.jl()` need the Julia `bin/` directory. This will be specific to your local machine and must be uniquely specified.
 
-## Continuous landscape surface
-cont.rast <- raster_orig$cont_orig
-
-## Genetic distance measured between sample locations (chord distance)
-gen.dist <- Dc_list$Dc_cont
-
-plot(cont.rast)
-plot(sp.dat, add = T, pch = 19)
+```{r julia-home, eval=FALSE}
+JULIA_HOME <- "C:/Users/your-name/AppData/Local/Programs/Julia-1.11.4/bin/"
+Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 ```
 
-Next prepare the GA and Julia inputs. You need to specify the full path to the Julia software on your computer, and connect Julia to R. The first time you run Julia within an R session, it will be quite slow as a lot is being prepared in the background.
-```{r load julia, eval=FALSE}
-## Specify path the to `bin` directory
-## This path may vary depending upon Julia version or operating system
+```{r julia-home-run, include=FALSE}
 JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia-1.11.4/bin/"
+Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 ```
 
+After R knows where Julia lives, `JuliaConnectoR` will start Julia lazily on
+the first `juliaEval()` or `juliaCall()` invocation. In other words, the calls
+below do not test an already-open connection; they are what trigger the initial
+Julia startup and then verify that evaluation works.
 
-Next run the preparation functions.
-```{r prep function, eval = FALSE}
-GA.inputs <- GA.prep(ASCII.dir = cont.rast,
-                     Results.dir = "C:/Rga_examples/",
-                     parallel = 4)
-jl.inputs <- jl.prep(n.Pops = length(sp.dat),
-                     response = lower(gen.dist),
-                     CS_Point.File = sp.dat,
-                     JULIA_HOME = JULIA_HOME)
+```{r verify-julia, eval=TRUE}
+Sys.setenv(JULIA_BINDIR = JULIA_HOME)
+JuliaConnectoR::juliaEval("string(VERSION)")
+JuliaConnectoR::juliaEval("using Circuitscape")
 ```
 
+# Prepare a Small Julia Example
 
-If everything is working correctly, you should see the following message in the console:
-```
-[1] "Test: Run Circuitscape from Julia"
+The package includes a lightweight example that is convenient for setup checks.
 
-Test Passed
-```
+```{r small-example}
+pts <- vect(samples[, 2:3], type = "points")
+surface <- resistance_surfaces[["continuous"]]
+pairwise_genetic <- lower(as.matrix(dist(samples[, 2:3])))
 
-The default method for solving the resistance surface is to use `cholmod = TRUE`. As described on the Circuitscape Julia page, this is where the speed gains are achieved. However, this approach can be VERY memory intensive, so may not be practical if dealing with large rasters. As an alternative when using large rasters, you may want to switch to the *experimental* single precision method. This requires setting `cholmod = FALSE` and `precision  = TRUE`.
-
-Finally, optimize your resistance surface(s). 
-```{r optimize,eval=FALSE}
-jl.optim <- SS_optim(jl.inputs = jl.inputs,
-                     GA.inputs = GA.inputs)
+pts
+surface
 ```
 
-The use of `SS_optim`, `MS_optim`, and `all_comb` are the same as before. You just need to provide the `jl.inputs` object created from the `jl.prep` function to optimize with Julia.
+Now create the Julia inputs. Setting `run_test = TRUE` is a useful smoke test
+the first time you connect Julia to the package on a machine.
 
-Good luck, and please let me know if you encounter issues!
+```{r jl-prep, eval=FALSE}
+jl_inputs <- jl.prep(
+  n.Pops = nrow(samples),
+  response = pairwise_genetic,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  run_test = TRUE,
+  silent = TRUE
+)
+```
+
+# Run Circuitscape from R
+
+## Pairwise resistance distances
+
+To compute pairwise effective resistance distances directly:
+
+```{r run-circuitscape, eval=FALSE}
+cs_vector <- Run_CS.jl(
+  jl.inputs = jl_inputs,
+  r = surface,
+  output = "matrix"
+)
+```
+
+The package ships a precomputed example result from this same lightweight
+workflow:
+
+```{r precomputed-cs}
+length(vignette_pairwise_outputs$circuitscape_matrix)
+head(vignette_pairwise_outputs$circuitscape_matrix)
+```
+
+## Current maps
+
+To compute a cumulative current map, set `CurrentMap = TRUE` and request raster
+output. `EXPORT.dir` can be any directory path; the wrapper handles path
+normalization internally.
+
+```{r run-current-map, eval=FALSE}
+current_map <- Run_CS.jl(
+  jl.inputs = jl_inputs,
+  r = surface,
+  CurrentMap = TRUE,
+  output = "raster",
+  EXPORT.dir = file.path(tempdir(), "ResistanceGA2-current-map")
+)
+```
+
+The package also includes a precomputed current map from that same example:
+
+```{r precomputed-current-map}
+vignette_current_map
+```
+
+# Use Julia in Optimization
+
+Once `jl_inputs` is ready, the optimization workflow looks just like the
+`gdistance` workflow except that you pass `jl.inputs` instead of `gdist.inputs`.
+The same transformation guidance applies here: for continuous surfaces, it is
+usually best to restrict searches to Monomolecular families unless you have a
+strong biological or ecological reason to test unimodal or quadratic-type
+Ricker relationships.
+
+```{r julia-optim, eval=FALSE}
+GA.inputs <- GA.prep(
+  raster = resistance_surfaces[["continuous"]],
+  Results.dir = file.path(tempdir(), "ResistanceGA2-julia"),
+  pop.size = 20,
+  maxiter = 10,
+  run = 5,
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+ss_out <- SS_optim(
+  jl.inputs = jl_inputs,
+  GA.inputs = GA.inputs,
+  dist_mod = FALSE,
+  null_mod = FALSE,
+  diagnostic_plots = FALSE
+)
+```
+
+For multiple surfaces:
+
+```{r julia-ms, eval=FALSE}
+GA.inputs_multi <- GA.prep(
+  raster = resistance_surfaces[[c("categorical", "continuous")]],
+  Results.dir = file.path(tempdir(), "ResistanceGA2-julia-multi"),
+  pop.size = 20,
+  maxiter = 10,
+  run = 5,
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+ms_out <- MS_optim(
+  jl.inputs = jl_inputs,
+  GA.inputs = GA.inputs_multi,
+  diagnostic_plots = FALSE
+)
+```
+
+# Tuning and Troubleshooting
+
+Some options are especially useful when working with Julia-backed runs:
+
+- `run_test = TRUE` in `jl.prep()` verifies the Julia/Circuitscape connection before a long run.
+- `cholmod = TRUE` is usually fastest, but can be memory-intensive on large rasters.
+- `cholmod = FALSE, precision = TRUE` switches to the single-precision path when memory is limiting.
+- `scratch` is helpful if the default temporary directory is slow or restricted.
+- `rm.files = FALSE` can be useful while debugging generated Circuitscape inputs and outputs.
+- `write.files` and `write.criteria` let you keep the generated `.ini` and raster files for selected runs.
+
+If Julia is installed but the package cannot connect:
+
+- confirm `JULIA_HOME` or `JULIA_BINDIR` points to Julia’s `bin/` directory
+- run `JuliaConnectoR::juliaEval("using Circuitscape")` manually
+- make sure `Circuitscape.jl` is installed in the Julia environment you are actually invoking
+
+# Summary
+
+The Julia backend is now the supported Circuitscape path for `ResistanceGA2`.
+Once Julia and `Circuitscape.jl` are working, the rest of the package workflow
+remains close to the `gdistance` workflow: create `GA.inputs`, create
+`jl.inputs`, then run `SS_optim()`, `MS_optim()`, `all_comb()`, or direct
+`Run_CS.jl()` calls as needed.

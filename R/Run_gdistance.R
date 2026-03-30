@@ -4,8 +4,8 @@
 #' using the \code{gdistance} package.
 #'
 #' @param gdist.inputs Object created by \code{\link[ResistanceGA2]{gdist.prep}}.
-#' @param r A \code{SpatRaster} object (from the \pkg{terra} package) or the
-#'   path to a raster file readable by \code{terra::rast()}.
+#' @param r A single-layer \code{SpatRaster} object (from the \pkg{terra}
+#'   package).
 #' @param scl Logical. Scale the correction values (default \code{TRUE}). Set
 #'   to \code{FALSE} to obtain absolute distance values. See
 #'   \code{\link[gdistance]{geoCorrection}} for details.
@@ -13,28 +13,33 @@
 #' @return A numeric distance vector (or matrix) of pairwise cost/commute
 #'   distances. Returns \code{-99999} on error or warning.
 #'
+#' @details
+#' \pkg{gdistance} still operates on \pkg{raster} objects. This function keeps
+#' the public API terra-based by coercing the supplied \code{SpatRaster}
+#' internally before building the transition object.
+#'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
-#' \dontrun{
-#' library(terra)
-#' r <- rast(nrows = 50, ncols = 50, vals = runif(2500))
-#' coords <- matrix(runif(20, 0, 50), ncol = 2)
-#' gdist.inputs <- gdist.prep(n.Pops = 10, samples = coords)
-#' cd <- Run_gdistance(gdist.inputs, r)
-#' }
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
+#' gdist.inputs <- gdist.prep(
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   samples = pts,
+#'   method = "costDistance"
+#' )
+#'
+#' cd <- Run_gdistance(gdist.inputs, raster_orig[["cont_orig"]])
+#' length(cd)
 Run_gdistance <- function(gdist.inputs,
                           r,
                           scl = TRUE) {
   out <- tryCatch(
     {
-      if (!inherits(r, "SpatRaster")) {
-        r <- terra::rast(r)
-      }
+      r_gd <- .gdistance_raster(r, arg = "r")
 
       tr <- gdistance::transition(
-        x = r,
+        x = r_gd,
         transitionFunction = gdist.inputs$transitionFunction,
         directions = gdist.inputs$directions
       )
@@ -77,7 +82,7 @@ Run_gdistance <- function(gdist.inputs,
         }
       }
 
-      rm(tr, r)
+      rm(tr, r_gd)
       gc()
       return(ret)
     },

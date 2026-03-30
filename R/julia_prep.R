@@ -7,10 +7,8 @@
 #' @param response Vector of pairwise genetic distances (lower half of pairwise
 #'   matrix). If using \code{pairs_to_include}, provide the full lower-half
 #'   vector; it will be trimmed automatically.
-#' @param CS_Point.File One of: (1) a \code{\link[terra]{SpatVector}} of sample
-#'   point locations, (2) the path to a tab-delimited Circuitscape point file
-#'   (three columns: site ID, x, y), or (3) the path to an \code{.asc} raster
-#'   whose non-NA cells identify sample locations.
+#' @param CS_Point.File A \code{\link[terra]{SpatVector}} of sample point
+#'   locations.
 #' @param covariates Data frame of additional covariates for the MLPE model.
 #' @param formula R formula for the fixed effects of the MLPE model (e.g.,
 #'   \code{response ~ covariate}). The \code{response} term uses the values in
@@ -35,7 +33,8 @@
 #' @param run_test Logical. Test the Julia/Circuitscape connection before
 #'   continuing? Default = \code{TRUE}.
 #' @param write.files Directory path. If provided, the \code{.ini} and
-#'   \code{.asc} files used in each Circuitscape run are saved there.
+#'   \code{.asc} files used in each Circuitscape run are saved there. If the
+#'   directory does not exist, it will be created automatically.
 #' @param write.criteria Minimum run time (seconds) threshold for writing files
 #'   when \code{write.files} is set. If \code{NULL}, all runs are written.
 #' @param silent Logical. Suppress Circuitscape progress output?
@@ -60,22 +59,22 @@
 #' solver for moderate problem sizes, but may consume large amounts of memory
 #' for very large problems. It cannot be used with single precision.
 #'
+#' Point locations are supplied as a \code{SpatVector} and written to a
+#' temporary Circuitscape point file internally.
+#'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
 #' \dontrun{
-#' library(terra)
-#' # Create a SpatVector of sample points
-#' coords <- matrix(runif(20, 0, 100), ncol = 2)
-#' pts    <- vect(coords, crs = "")
-#' gd     <- runif(choose(10, 2))
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
 #'
 #' jl.inputs <- jl.prep(
-#'   n.Pops       = 10,
-#'   response     = gd,
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = lower(Dc_list[[1]]),
 #'   CS_Point.File = pts,
-#'   JULIA_HOME   = "/usr/local/julia/bin"
+#'   JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
+#'   run_test = FALSE
 #' )
 #' }
 jl.prep <- function(n.Pops,
@@ -108,10 +107,20 @@ jl.prep <- function(n.Pops,
       nrow(covariates) != length(response)) {
     stop("'response' and 'covariates' must have the same number of observations.")
   }
+  cs_points <- .validate_spatvector_points(CS_Point.File, arg = "CS_Point.File")
+
   if (!is.null(write.files)) {
-    write.files <- paste0(normalizePath(write.files, winslash = "/"), "/")
-    if (!dir.exists(write.files))
-      stop("'write.files' directory does not exist: ", write.files)
+    write.files <- paste0(
+      sub("[/\\\\]+$", "", normalizePath(write.files, winslash = "/", mustWork = FALSE)),
+      "/"
+    )
+    if (!dir.exists(write.files)) {
+      dir.create(write.files, recursive = TRUE, showWarnings = FALSE)
+      if (!dir.exists(write.files)) {
+        stop("Failed to create 'write.files' directory: ", write.files)
+      }
+      message("Created 'write.files' directory: ", write.files)
+    }
   }
 
   # Julia setup ---------------------------------------------------------------
@@ -162,41 +171,18 @@ jl.prep <- function(n.Pops,
   }
 
   # Parse CS_Point.File -------------------------------------------------------
-  cs_coords <- NULL   # coordinates matrix (x, y)
-
-  if (inherits(CS_Point.File, "SpatVector")) {
-    site      <- seq_len(nrow(CS_Point.File))
-    cs_coords <- terra::crds(CS_Point.File)
-    cs.txt    <- data.frame(site, cs_coords)
-    write.table(cs.txt,
-                file      = paste0(td, "sample_pts.txt"),
-                col.names = FALSE,
-                row.names = FALSE)
-    CS_Point.File <- paste0(td, "sample_pts.txt")
-
-  } else if (is.character(CS_Point.File) && grepl("\\.asc$", CS_Point.File)) {
-    CS_grid   <- terra::rast(CS_Point.File)
-    pts_df    <- terra::as.data.frame(CS_grid, xy = TRUE)
-    site      <- pts_df[[3]]           # third column is cell value (site ID)
-    cs_coords <- as.matrix(pts_df[, c("x", "y")])
-    cs.txt    <- data.frame(site, cs_coords)
-    cs.txt    <- cs.txt[order(site), ]
-    CS_Point.File <- sub("\\.asc$", ".txt", CS_Point.File)
-    write.table(cs.txt,
-                file      = CS_Point.File,
-                col.names = FALSE,
-                row.names = FALSE)
-
-  } else if (is.character(CS_Point.File) && file.exists(CS_Point.File)) {
-    cs.txt    <- read.delim(CS_Point.File, header = FALSE)
-    cs_coords <- as.matrix(cs.txt[, 2:3])
-
-  } else {
-    stop(
-      "'CS_Point.File' must be a SpatVector, path to a .asc file, ",
-      "or path to a Circuitscape-formatted .txt file."
-    )
+  cs_coords <- .point_coords(cs_points, arg = "CS_Point.File")
+  if (n.Pops != nrow(cs_coords)) {
+    stop("'n.Pops' (", n.Pops, ") does not equal the number of sample locations (",
+         nrow(cs_coords), ").")
   }
+  site      <- seq_len(nrow(cs_points))
+  cs.txt    <- data.frame(site, cs_coords)
+  write.table(cs.txt,
+              file      = paste0(td, "sample_pts.txt"),
+              col.names = FALSE,
+              row.names = FALSE)
+  CS_Point.File <- paste0(td, "sample_pts.txt")
 
   # Test run ------------------------------------------------------------------
   if (isTRUE(run_test)) {
@@ -214,7 +200,7 @@ jl.prep <- function(n.Pops,
     tmp.name  <- sub("\\.ini$", "", basename(temp.ini))
 
     terra::writeRaster(
-      x         = ResistanceGA2::resistance_surfaces$continuous,
+      x         = ResistanceGA2::resistance_surfaces[["continuous"]],
       filename  = paste0(td, tmp.name, ".asc"),
       overwrite = TRUE
     )
@@ -232,7 +218,10 @@ jl.prep <- function(n.Pops,
     )
 
     wd  <- getwd()
-    out <- JuliaConnectoR::juliaCall("compute", normalizePath(temp.ini))[-1, -1]
+    invisible(capture.output(
+      out <- JuliaConnectoR::juliaCall("compute", normalizePath(temp.ini))[-1, -1],
+      type = "message"
+    ))
     if (getwd() != wd) setwd(wd)
 
     if (nrow(out) == 5L) {
@@ -251,7 +240,7 @@ jl.prep <- function(n.Pops,
   if (!is.null(nb)) {
     ID <- To.From.ID(sampled_pops = n.Pops,
                      pop_n        = pop2ind,
-                     spLoc        = CS_Point.File,
+                     spLoc        = cs_points,
                      nb           = nb)
   } else {
     ID <- To.From.ID(sampled_pops = n.Pops,

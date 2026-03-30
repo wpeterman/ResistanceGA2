@@ -28,8 +28,7 @@ Run_CS.jl(
 \item{jl.inputs}{Object from \code{\link{jl.prep}}. When provided, all other
 Julia/CS settings are taken from this object.}
 
-\item{r}{A \code{SpatRaster} (from \pkg{terra}) or path to a raster file
-readable by \code{terra::rast()}.}
+\item{r}{A single-layer \code{SpatRaster} (from \pkg{terra}).}
 
 \item{CurrentMap}{Logical. Generate the cumulative current map?
 Default = \code{FALSE}.}
@@ -39,7 +38,8 @@ only the lower triangle? Default = \code{FALSE}. Cannot be requested when
 \code{pairs_to_include} is used.}
 
 \item{EXPORT.dir}{Directory where Circuitscape results are written. Required
-when \code{CurrentMap = TRUE}.}
+when \code{CurrentMap = TRUE}. If the directory does not exist, it will be
+created automatically.}
 
 \item{output}{\code{"matrix"} (default) returns the lower-half pairwise
 resistance vector; \code{"raster"} returns a \code{SpatRaster} of the
@@ -82,11 +82,22 @@ Lower-half pairwise resistance vector, a full square matrix
 Executes Circuitscape through Julia (via \pkg{JuliaConnectoR}) and returns
 pairwise resistance distances.
 }
+\details{
+Users should supply terra objects directly. The raster and point files needed
+by Circuitscape are written to temporary files internally for each run.
+}
 \examples{
 \dontrun{
-library(terra)
-r         <- rast(nrows = 100, ncols = 100, vals = runif(1e4))
-cs.result <- Run_CS.jl(jl.inputs = jl.inputs, r = r)
+pts <- terra::vect(sample_pops[[1]], type = "points")
+jl.inputs <- jl.prep(
+  n.Pops = nrow(sample_pops[[1]]),
+  response = lower(Dc_list[[1]]),
+  CS_Point.File = pts,
+  JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
+  run_test = FALSE
+)
+
+cs.result <- Run_CS.jl(jl.inputs = jl.inputs, r = raster_orig[["cont_orig"]])
 }
 }
 \author{

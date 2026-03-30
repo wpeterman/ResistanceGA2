@@ -4,6 +4,10 @@ make_coords <- function(n, seed = 1) {
   matrix(runif(n * 2, 0, 100), ncol = 2)
 }
 
+make_points <- function(n, seed = 1) {
+  terra::vect(make_coords(n, seed = seed), type = "points")
+}
+
 make_gd <- function(n, seed = 2) {
   set.seed(seed)
   runif(choose(n, 2))
@@ -12,7 +16,7 @@ make_gd <- function(n, seed = 2) {
 # ----- Basic structure --------------------------------------------------------
 
 test_that("gdist.prep returns list with all expected names", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   gd     <- make_gd(10)
   out    <- gdist.prep(n.Pops = 10, response = gd, samples = coords)
   expected <- c("response", "samples", "covariates", "formula",
@@ -22,7 +26,7 @@ test_that("gdist.prep returns list with all expected names", {
 })
 
 test_that("gdist.prep stores samples as matrix", {
-  coords <- make_coords(8)
+  coords <- make_points(8)
   out    <- gdist.prep(n.Pops = 8, samples = coords)
   expect_true(is.matrix(out$samples))
   expect_equal(ncol(out$samples), 2L)
@@ -30,7 +34,7 @@ test_that("gdist.prep stores samples as matrix", {
 
 test_that("gdist.prep ZZ has dimensions n × choose(n,2)", {
   n      <- 7
-  coords <- make_coords(n)
+  coords <- make_points(n)
   gd     <- make_gd(n)
   out    <- gdist.prep(n.Pops = n, response = gd, samples = coords)
   expect_equal(nrow(out$ZZ), n)
@@ -38,14 +42,14 @@ test_that("gdist.prep ZZ has dimensions n × choose(n,2)", {
 })
 
 test_that("gdist.prep default formula is gd ~ cd + (1 | pop)", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   gd     <- make_gd(10)
   out    <- gdist.prep(n.Pops = 10, response = gd, samples = coords)
   expect_equal(deparse(out$formula), "gd ~ cd + (1 | pop)")
 })
 
 test_that("gdist.prep df has gd and pop columns when response supplied", {
-  coords <- make_coords(8)
+  coords <- make_points(8)
   gd     <- make_gd(8)
   out    <- gdist.prep(n.Pops = 8, response = gd, samples = coords)
   expect_true(all(c("gd", "pop") %in% names(out$df)))
@@ -53,7 +57,7 @@ test_that("gdist.prep df has gd and pop columns when response supplied", {
 })
 
 test_that("gdist.prep df is NULL when no response supplied", {
-  coords <- make_coords(8)
+  coords <- make_points(8)
   out    <- gdist.prep(n.Pops = 8, samples = coords)
   expect_null(out$df)
 })
@@ -61,12 +65,12 @@ test_that("gdist.prep df is NULL when no response supplied", {
 # ----- Input validation errors ------------------------------------------------
 
 test_that("gdist.prep errors when n.Pops != nrow(samples)", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   expect_error(gdist.prep(n.Pops = 5, samples = coords), "n.Pops")
 })
 
 test_that("gdist.prep errors when response is a matrix", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   expect_error(
     gdist.prep(n.Pops = 10, response = matrix(1:45, 9), samples = coords),
     "vector"
@@ -74,7 +78,7 @@ test_that("gdist.prep errors when response is a matrix", {
 })
 
 test_that("gdist.prep errors when covariates is not a data frame", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   gd     <- make_gd(10)
   expect_error(
     gdist.prep(n.Pops = 10, response = gd, samples = coords,
@@ -84,7 +88,7 @@ test_that("gdist.prep errors when covariates is not a data frame", {
 })
 
 test_that("gdist.prep errors on mismatched response and covariates lengths", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   gd     <- make_gd(10)
   cov    <- data.frame(x = runif(10))  # wrong length: need choose(10,2) = 45
   expect_error(
@@ -94,7 +98,7 @@ test_that("gdist.prep errors on mismatched response and covariates lengths", {
 })
 
 test_that("gdist.prep errors on unsupported min.max_dist", {
-  coords <- make_coords(10)
+  coords <- make_points(10)
   gd     <- make_gd(10)
   expect_error(
     gdist.prep(n.Pops = 10, response = gd, samples = coords,
@@ -107,31 +111,42 @@ test_that("gdist.prep errors on unsupported min.max_dist", {
 
 test_that("gdist.prep accepts SpatVector samples", {
   coords <- make_coords(10)
-  sv     <- terra::vect(coords)
+  sv     <- terra::vect(coords, type = "points")
   gd     <- make_gd(10)
   out    <- gdist.prep(n.Pops = 10, response = gd, samples = sv)
   expect_equal(as.numeric(out$samples), as.numeric(coords))
 })
 
-test_that("gdist.prep accepts data.frame samples", {
-  coords <- as.data.frame(make_coords(10))
+test_that("gdist.prep errors on matrix samples", {
+  coords <- make_coords(10)
   gd     <- make_gd(10)
-  out    <- gdist.prep(n.Pops = 10, response = gd, samples = coords)
-  expect_true(is.matrix(out$samples))
+  expect_error(
+    gdist.prep(n.Pops = 10, response = gd, samples = coords),
+    "SpatVector"
+  )
+})
+
+test_that("gdist.prep errors on data.frame samples", {
+  coords <- as.data.frame(make_coords(10))
+  gd <- make_gd(5)
+  expect_error(
+    gdist.prep(n.Pops = 10, response = make_gd(10), samples = coords),
+    "SpatVector"
+  )
 })
 
 test_that("gdist.prep errors on invalid samples type", {
   gd <- make_gd(5)
   expect_error(
     gdist.prep(n.Pops = 5, response = gd, samples = list(x = 1:5, y = 1:5)),
-    "coordinate matrix"
+    "SpatVector"
   )
 })
 
 # ----- Covariates and formula -------------------------------------------------
 
 test_that("gdist.prep incorporates covariates into df", {
-  coords <- make_coords(8)
+  coords <- make_points(8)
   gd     <- make_gd(8)
   n_pairs <- choose(8, 2)
   cov    <- data.frame(elevation = runif(n_pairs))
@@ -141,7 +156,7 @@ test_that("gdist.prep incorporates covariates into df", {
 })
 
 test_that("gdist.prep updates formula when covariates and formula supplied", {
-  coords <- make_coords(8)
+  coords <- make_points(8)
   gd     <- make_gd(8)
   n_pairs <- choose(8, 2)
   cov    <- data.frame(elev = runif(n_pairs))
@@ -157,11 +172,12 @@ test_that("gdist.prep updates formula when covariates and formula supplied", {
 test_that("gdist.prep warns when gd decreases with Euclidean distance", {
   n      <- 8
   coords <- matrix(c(seq_len(n), rep(0, n)), ncol = 2)
+  pts    <- terra::vect(coords, type = "points")
   ed     <- as.vector(dist(coords))
   # Invert: large Euclidean → small genetic distance
   gd     <- max(ed) - ed + rnorm(length(ed), 0, 0.01)
   expect_warning(
-    gdist.prep(n.Pops = n, response = gd, samples = coords),
+    gdist.prep(n.Pops = n, response = gd, samples = pts),
     "decreases"
   )
 })

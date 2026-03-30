@@ -1,11 +1,23 @@
 #' Analyze all combinations
 #'
-#' A wrapper function to run both \code{\link[ResistanceGA2]{SS_optim}} and \code{\link[ResistanceGA2]{MS_optim}} to optimize all combinations of resistance surfaces with the Genetic Algorithms package \pkg{GA}. Following optimization, \code{\link[ResistanceGA2]{Resist.boot}} is run to conduct a bootstrap analysis.  This function can only be used when optimizing resistance surface with least cost path or commute distance (\pkg{gdistance}).
+#' A wrapper function to run both \code{\link[ResistanceGA2]{SS_optim}} and
+#' \code{\link[ResistanceGA2]{MS_optim}} to optimize all combinations of
+#' resistance surfaces with the Genetic Algorithms package \pkg{GA}. Following
+#' optimization, \code{\link[ResistanceGA2]{Resist.boot}} is run to conduct a
+#' bootstrap analysis.
 #'
-#' @param gdist.inputs Object created from running \code{\link[ResistanceGA2]{gdist.prep}} function. Defined if optimizing using gdistance
-#' @param jl.inputs Object created from running \code{\link[ResistanceGA2]{jl.prep}} function. Defined if optimizing using CIRCUITSCAPE run in Julia
-#' @param GA.inputs Object created from running \code{\link[ResistanceGA2]{GA.prep}} function. Be sure that the \code{Results.dir} has been been correctly specified as "all.comb"
-#' @param results.dir Directory to write and save analysis results. This should be an empty directory. Any existing files located in this directory will be deleted!
+#' @param gdist.inputs Object created from running
+#'   \code{\link[ResistanceGA2]{gdist.prep}}. Supply when optimizing with
+#'   \pkg{gdistance}.
+#' @param jl.inputs Object created from running
+#'   \code{\link[ResistanceGA2]{jl.prep}}. Supply when optimizing with
+#'   Circuitscape in Julia.
+#' @param GA.inputs Object created from running
+#'   \code{\link[ResistanceGA2]{GA.prep}}. Be sure that
+#'   \code{Results.dir = "all.comb"} was used when creating this object.
+#' @param results.dir Directory to write and save analysis results. If the
+#'   directory does not exist, it will be created automatically. Any existing
+#'   files located in this directory may be deleted after confirmation.
 #' @param max.combination The maximum number of surfaces to include in the all combinations analysis (Default = 4). Alternatively, specify a vector with the minimum and maximum number of surfaces to combine (e.g., c(2,4). If the minimum > 1, then the single surface optimization will be skipped.
 #' @param iters Number of bootstrap iterations to be conducted (Default = 1000)
 #' @param sample.prop Proportion of observations to be sampled each iteration (Default = 0.75)
@@ -31,11 +43,34 @@
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' @export
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
+#' gd <- lower(Dc_list[[1]])
+#'
+#' gdist.inputs <- gdist.prep(
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = gd,
+#'   samples = pts
+#' )
+#'
+#' GA.inputs <- GA.prep(
+#'   raster = raster_orig,
+#'   Results.dir = "all.comb",
+#'   quiet = TRUE
+#' )
+#'
+#' results_dir <- file.path(tempdir(), "ResistanceGA2-all-comb")
+#'
+#' combo.out <- all_comb(
+#'   gdist.inputs = gdist.inputs,
+#'   GA.inputs = GA.inputs,
+#'   results.dir = results_dir,
+#'   max.combination = 2,
+#'   iters = 10,
+#'   replicate = 1
+#' )
+#' }
 
 all_comb <- function(gdist.inputs = NULL,
                      jl.inputs = NULL,
@@ -70,6 +105,19 @@ all_comb <- function(gdist.inputs = NULL,
   
   if(length(max.combination) > 2) {
     return(cat("ERROR: Please specify either a single value or a vector with the minimum and maximum value"))
+  }
+  
+  results.dir <- paste0(
+    sub("[/\\\\]+$", "", normalizePath(results.dir, winslash = "/", mustWork = FALSE)),
+    "/"
+  )
+  
+  if(!dir.exists(results.dir)) {
+    dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+    if(!dir.exists(results.dir)) {
+      stop("Failed to create 'results.dir': ", results.dir)
+    }
+    message("Created 'results.dir': ", results.dir)
   }
   
   dir.files <- list.files(results.dir)
@@ -194,317 +242,72 @@ all_comb <- function(gdist.inputs = NULL,
       dir.create(paste0(results.dir,'rep_',i, "/", "single.surface"))
       dir.create(paste0(results.dir,'rep_',i, "/", "single.surface/", "Plots"))
       
-      # Single Surface optimization -----------------------------------------------------
-      if(!is.null(GA.inputs$scale)) {
-        
-        # * Single Surface: scaled --------------------------------------------------------
-        
-        # Update GA.input directories
-        GA.inputs$Plots.dir <- paste0(results.dir,
+      # Single-surface optimization -------------------------------------------
+      GA.inputs$Plots.dir <- paste0(results.dir,
+                                    'rep_',i, 
+                                    "/",
+                                    "single.surface/",
+                                    "Plots/")
+      
+      GA.inputs$Results.dir <- paste0(results.dir,
                                       'rep_',i, 
-                                      "/",
-                                      "single.surface/",
-                                      "Plots/")
-        
-        GA.inputs$Results.dir <- paste0(results.dir,
-                                        'rep_',i, 
-                                        "/", 
-                                        "single.surface/")
-        
-        if(!is.null(gdist.inputs)) {
-          ss.results <- SS_optim(gdist.inputs = gdist.inputs,
-                                       GA.inputs = GA.inputs,
-                                       dist_mod = dist_mod,
-                                       null_mod = null_mod)
-        } else if(!is.null(jl.inputs)) {
-          ss.results <- SS_optim(jl.inputs = jl.inputs,
-                                       GA.inputs = GA.inputs,
-                                       dist_mod = dist_mod,
-                                       null_mod = null_mod)
-        } else {
-          stop("`gdist.inputs` or `jl.inputs` must be specified!!!")
-        }
-        
-        
-        
-        AICc.tab <- ss.results$AICc 
+                                      "/", 
+                                      "single.surface/")
+      
+      if(!is.null(gdist.inputs)) {
+        ss.results <- SS_optim(gdist.inputs = gdist.inputs,
+                               GA.inputs = GA.inputs,
+                               dist_mod = dist_mod,
+                               null_mod = null_mod)
+      } else if(!is.null(jl.inputs)) {
+        ss.results <- SS_optim(jl.inputs = jl.inputs,
+                               GA.inputs = GA.inputs,
+                               dist_mod = dist_mod,
+                               null_mod = null_mod)
       } else {
-        # * Single Surface --------------------------------------------------------
-        
-        # Update GA.input directories
-        GA.inputs$Plots.dir <- paste0(results.dir,
-                                      'rep_',i, 
-                                      "/",
-                                      "single.surface/",
-                                      "Plots/")
-        
-        GA.inputs$Results.dir <- paste0(results.dir,
-                                        'rep_',i, 
-                                        "/", 
-                                        "single.surface/")
-        
-        if(!is.null(gdist.inputs)) {
-          ss.results <- SS_optim(gdist.inputs = gdist.inputs,
-                                 GA.inputs = GA.inputs,
-                                 dist_mod = dist_mod,
-                                 null_mod = null_mod)
-        } else if(!is.null(jl.inputs)) {
-          ss.results <- SS_optim(jl.inputs = jl.inputs,
-                                 GA.inputs = GA.inputs,
-                                 dist_mod = dist_mod,
-                                 null_mod = null_mod)
-        } else {
-          stop("`gdist.inputs` or `jl.inputs` must be specified!!!")
-        }
-        
-        AICc.tab <- ss.results$AICc
+        stop("`gdist.inputs` or `jl.inputs` must be specified!!!")
       }
+      
+      AICc.tab <- ss.results$AICc
     }
     
-    if(isTRUE(GA.input_orig$gaisl)) {
+    if(is.null(ss.results)) {
+      best.list <- list()
+    } else if(isTRUE(GA.input_orig$gaisl)) {
       best.list <- lapply(ss.results$ga, function(x) x@solutions) # Extract best individuals
       best.list <- lapply(best.list, function(x) plyr::ldply(x))
-      
     } else {
       best.list <- lapply(ss.results$ga, function(x) x@population) # Extract best individuals
-      
     }
     
     
     # Multisurface optimization -----------------------------------------------
     
-    # * Multisurface: scaled ----------------------------------------------------------
+    ms.cd <- vector(mode = 'list',
+                    length = length(all.combs))
     
-    if(!is.null(GA.inputs$scale)) {
-      
-      ms.cd <- vector(mode = 'list',
-                      length = length(all.combs))
-      
-      ms.k <- vector(mode = 'list',
-                     length = length(all.combs))
-      
-      AICc.tab_list <- vector(mode = 'list',
-                              length = length(all.combs))
-      
-      ms.results <- vector(mode = "list", length = length(all.combs))
-      
-      if(is.null(ss.results)) {
-        n_ss.cd <- 0
-        all.cd <- ms.cd
-      } else {
-        n_ss.cd <- length(ss.results$cd)
-        all.cd <- c(ss.results$cd,
-                    ms.cd)
-      }
-      
-      
-      for(j in 1:length(all.combs)) {
-        dir.create(paste0(results.dir,'rep_',i, "/", comb.names[[j]]))
-        # dir.create(paste0(results.dir,'rep_',i, "/", comb.names[[j]],"/Plots"))
-        
-        # Select raster surfaces
-        r.vec <- 1:GA.input_orig$n.layers
-        drop.vec <- r.vec[!(r.vec %in% all.combs[[j]])]
-        asc.comb <- terra::subset(GA.input_orig$Resistance.stack, all.combs[[j]])
-
-        ## Make suggestions
-        suggest <- vector(mode = 'list', length = length(all.combs[[j]]))
-          
-        for(s in 1:length(all.combs[[j]])) {
-          suggest.sample <- sample(GA.input_orig$pop.size, GA.input_orig$pop.size, replace = F)
-          suggest[[s]] <- best.list[[all.combs[[j]][s]]][suggest.sample,]
-        }
-        
-        suggest.c <- do.call(cbind, suggest)
-        
-        if(!is.null(GA.input_orig$inputs$select.trans)) {
-          s.trans <- GA.input_orig$inputs$select.trans[all.combs[[j]]]
-        } else {
-          s.trans <- GA.input_orig$inputs$select.trans
-        }
-        
-        # Update GA.input 
-        
-        # *-* Island GA ---------------------------------------------------------------
-        
-        if(isTRUE(GA.input_orig$gaisl)) {
-          GA.inputs <- GA.prep(ASCII.dir = asc.comb,
-                               Results.dir = 'all.comb',
-                               min.cat = GA.input_orig$inputs$min.cat,
-                               max.cat = GA.input_orig$inputs$max.cat,
-                               max.cont = GA.input_orig$inputs$max.cont,
-                               cont.shape = NULL,
-                               select.trans = s.trans,
-                               method = GA.input_orig$inputs$method,
-                               k.value = GA.input_orig$inputs$k.value,
-                               pop.mult = GA.input_orig$inputs$pop.mult,
-                               percent.elite = GA.input_orig$inputs$percent.elite,
-                               type = GA.input_orig$inputs$type,
-                               pcrossover = GA.input_orig$inputs$pcrossover,
-                               pmutation = GA.input_orig$inputs$pmutation,
-                               maxiter = GA.input_orig$inputs$maxiter,
-                               run = GA.input_orig$inputs$run,
-                               keepBest = GA.input_orig$inputs$keepBest,
-                               population = GA.input_orig$inputs$population,
-                               selection = GA.input_orig$inputs$selection,
-                               crossover = GA.input_orig$inputs$crossover,
-                               mutation = GA.input_orig$inputs$mutation,
-                               pop.size = GA.input_orig$inputs$pop.size,
-                               gaisl = GA.input_orig$inputs$gaisl,
-                               island.pop = GA.input_orig$inputs$island.pop,
-                               numIslands = GA.input_orig$inputs$numIslands,
-                               migrationRate = GA.input_orig$inputs$migrationRate,
-                               migrationInterval = GA.input_orig$inputs$migrationInterval,
-                               optim = GA.input_orig$inputs$optim,
-                               optim.method = GA.input_orig$inputs$optim.method, 
-                               poptim = GA.input_orig$inputs$poptim,
-                               pressel = GA.input_orig$inputs$pressel,
-                               control = GA.input_orig$inputs$control,
-                               hessian = GA.input_orig$inputs$hessian,
-                               parallel = GA.input_orig$inputs$parallel,
-                               monitor = GA.input_orig$inputs$monitor,
-                               seed = GA.input_orig$inputs$seed,
-                               quiet = GA.input_orig$inputs$quiet
-          )
-        } else { # *-* Standard GA ----------------
-          GA.inputs <- GA.prep(ASCII.dir = asc.comb,
-                               Results.dir = 'all.comb',
-                               min.cat = GA.input_orig$inputs$min.cat,
-                               max.cat = GA.input_orig$inputs$max.cat,
-                               max.cont = GA.input_orig$inputs$max.cont,
-                               cont.shape = NULL,
-                               select.trans = s.trans,
-                               method = GA.input_orig$inputs$method,
-                               k.value = GA.input_orig$inputs$k.value,
-                               pop.mult = GA.input_orig$inputs$pop.mult,
-                               percent.elite = GA.input_orig$inputs$percent.elite,
-                               type = GA.input_orig$inputs$type,
-                               pcrossover = GA.input_orig$inputs$pcrossover,
-                               pmutation = GA.input_orig$inputs$pmutation,
-                               maxiter = GA.input_orig$inputs$maxiter,
-                               run = GA.input_orig$inputs$run,
-                               keepBest = GA.input_orig$inputs$keepBest,
-                               population = GA.input_orig$inputs$population,
-                               selection = GA.input_orig$inputs$selection,
-                               crossover = GA.input_orig$inputs$crossover,
-                               mutation = GA.input_orig$inputs$mutation,
-                               pop.size = GA.input_orig$inputs$pop.size,
-                               parallel = GA.input_orig$inputs$parallel,
-                               optim = GA.input_orig$inputs$optim,
-                               optim.method = GA.input_orig$inputs$optim.method, 
-                               poptim = GA.input_orig$inputs$poptim,
-                               pressel = GA.input_orig$inputs$pressel,
-                               control = GA.input_orig$inputs$control,
-                               hessian = GA.input_orig$inputs$hessian,
-                               monitor = GA.input_orig$inputs$monitor,
-                               seed = GA.input_orig$inputs$seed,
-                               quiet = GA.input_orig$inputs$quiet
-          )
-        }
-        
-        ## Update suggests
-        GA.inputs$SUGGESTS <- suggest.c
-        
-        # Update GA.input directories
-        GA.inputs$Plots.dir <- paste0(results.dir,
-                                      'rep_',i, 
-                                      "/", 
-                                      comb.names[[j]],
-                                      "/")
-        
-        GA.inputs$Results.dir <- paste0(results.dir,
-                                        'rep_',i, 
-                                        "/", 
-                                        comb.names[[j]],
-                                        "/")
-        
-        if(!is.null(gdist.inputs)) {
-          ms.results[[j]] <- MS_optim(gdist.inputs = gdist.inputs,
-                                            GA.inputs = GA.inputs)
-        } else if(!is.null(jl.inputs)) {
-          ms.results[[j]] <- MS_optim(jl.inputs = jl.inputs,
-                                            GA.inputs = GA.inputs)
-        } else {
-          stop("`gdist.inputs` or `jl.inputs` must be specified!!!")
-        }
-        
-        
-        
-        all.cd[[(j + n_ss.cd)]] <- ms.results[[j]]$cd[[1]]
-        
-        ms.k[[j]] <- ms.results[[j]]$k
-        
-        AICc.tab_list[[j]] <- ms.results[[j]]$AICc.tab
-      } # End combination loop
-      
-      # Convert combination lists to data frames
-      all.k <- rbind(ss.results$k,
-                     plyr::ldply(ms.k))
-      
-      names(all.cd) <- all.k$surface
-      
-      if(is.null(ss.results)) {
-        all.AICc <- plyr::ldply(AICc.tab_list)
-      } else {
-        all.AICc <- rbind(ss.results$AICc,
-                          plyr::ldply(AICc.tab_list))  
-      }
-      
-      
-      all.AICc <- all.AICc %>% 
-        dplyr::arrange(., AICc) %>%
-        dplyr::mutate(., delta.AICc = AICc - min(AICc)) %>%
-        dplyr::mutate(., weight = (exp(-0.5 * delta.AICc)) / sum(exp(-0.5 * delta.AICc))) %>%
-        as.data.frame()
-      
-      
-      # * Bootstrap: scaled -----------------------------------------------------
-      if(!is.null(gdist.inputs)) {
-        obs <- gdist.inputs$n.Pops
-        genetic.mat <- matrix(0, obs, obs)
-        genetic.mat[lower.tri(genetic.mat)] <- gdist.inputs$response
-      } else {
-        obs <- jl.inputs$n.Pops
-        genetic.mat <- matrix(0, obs, obs)
-        genetic.mat[lower.tri(genetic.mat)] <- jl.inputs$response
-      }
-      
-      boot.results <- Resist.boot(mod.names = all.k[,1],
-                                  dist.mat = all.cd,
-                                  n.parameters = all.k[,2],
-                                  sample.prop = sample.prop,
-                                  iters = iters,
-                                  obs = obs,
-                                  genetic.mat = genetic.mat)      
-    } else {     # End scaled optimization
-      
-      # Optimization without scaling --------------------------------------------
-      
-      # * Multisurface ----------------------------------------------------------
-      
-      ms.cd <- vector(mode = 'list',
-                      length = length(all.combs))
-      
-      ms.k <- vector(mode = 'list',
-                     length = length(all.combs))
-      
-      AICc.tab_list <- vector(mode = 'list',
-                              length = length(all.combs))
-      
-      ms.results <- vector(mode = "list", length = length(all.combs))
-      
+    ms.k <- vector(mode = 'list',
+                   length = length(all.combs))
+    
+    AICc.tab_list <- vector(mode = 'list',
+                            length = length(all.combs))
+    
+    ms.results <- vector(mode = "list", length = length(all.combs))
+    
+    if(is.null(ss.results)) {
+      n_ss.cd <- 0
+      all.cd <- ms.cd
+    } else {
       n_ss.cd <- length(ss.results$cd)
-      all.cd <- c(ss.results$cd,
-                  ms.cd)
-      
-      for(j in 1:length(all.combs)) {
+      all.cd <- c(ss.results$cd, ms.cd)
+    }
+    
+    for(j in 1:length(all.combs)) {
         dir.create(paste0(results.dir,'rep_',i, "/", comb.names[[j]]))
         # dir.create(paste0(results.dir,'rep_',i, "/", comb.names[[j]],"/Plots"))
         
         # Select raster surfaces
-        r.vec <- 1:GA.input_orig$n.layers
-        drop.vec <- r.vec[!(r.vec %in% all.combs[[j]])]
-        asc.comb <- terra::subset(GA.input_orig$Resistance.stack, all.combs[[j]])
+        raster.comb <- terra::subset(GA.input_orig$Resistance.stack, all.combs[[j]])
 
         if(!is.null(GA.input_orig$inputs$select.trans)) {
           s.trans <- GA.input_orig$inputs$select.trans[all.combs[[j]]]
@@ -532,7 +335,7 @@ all_comb <- function(gdist.inputs = NULL,
         # *-* Island GA ---------------------------------------------------------------
         
         if(isTRUE(GA.input_orig$gaisl)) {
-          GA.inputs <- GA.prep(ASCII.dir = asc.comb,
+          GA.inputs <- GA.prep(raster = raster.comb,
                                Results.dir = 'all.comb',
                                min.cat = GA.input_orig$inputs$min.cat,
                                max.cat = GA.input_orig$inputs$max.cat,
@@ -571,7 +374,7 @@ all_comb <- function(gdist.inputs = NULL,
                                quiet = GA.input_orig$inputs$quiet
           ) 
         } else { # *-* Standard GA ----------------------
-          GA.inputs <- GA.prep(ASCII.dir = asc.comb,
+          GA.inputs <- GA.prep(raster = raster.comb,
                                Results.dir = 'all.comb',
                                min.cat = GA.input_orig$inputs$min.cat,
                                max.cat = GA.input_orig$inputs$max.cat,
@@ -637,60 +440,55 @@ all_comb <- function(gdist.inputs = NULL,
         ms.k[[j]] <- ms.results[[j]]$k
         
         AICc.tab_list[[j]] <- ms.results[[j]]$AICc.tab
-      } # End combination loop
-      
-      # Convert combination lists to data frames
+    } # End combination loop
+    
+    # Convert combination lists to data frames
+    if(is.null(ss.results)) {
+      all.k <- plyr::ldply(ms.k)
+      all.AICc <- plyr::ldply(AICc.tab_list)
+    } else {
       all.k <- rbind(ss.results$k,
                      plyr::ldply(ms.k))
+      all.AICc <- rbind(ss.results$AICc,
+                        plyr::ldply(AICc.tab_list))
+    }
+    
+    names(all.cd) <- all.k$surface
+    
+    all.AICc <- all.AICc %>% 
+      dplyr::arrange(., AICc) %>%
+      dplyr::mutate(., delta.AICc = AICc - min(AICc)) %>%
+      dplyr::mutate(., weight = (exp(-0.5 * delta.AICc)) / sum(exp(-0.5 * delta.AICc))) %>%
+      as.data.frame()
+    
+    
+    # Bootstrap ----------------------------------------------------------
+    if(!is.null(gdist.inputs)) {
+      obs <- gdist.inputs$n.Pops
+      genetic.mat <- matrix(0, obs, obs)
+      genetic.mat[lower.tri(genetic.mat)] <- gdist.inputs$response
       
-      names(all.cd) <- all.k$surface
+      boot.results <- Resist.boot(mod.names = all.k[,1],
+                                  dist.mat = all.cd,
+                                  n.parameters = all.k[,2],
+                                  sample.prop = sample.prop,
+                                  iters = iters,
+                                  obs = obs,
+                                  genetic.mat = genetic.mat)
+    } else {
+      obs <- jl.inputs$n.Pops
+      genetic.mat <- matrix(0, obs, obs)
+      genetic.mat[lower.tri(genetic.mat)] <- jl.inputs$response.all
       
-      if(is.null(ss.results)) {
-        all.AICc <- plyr::ldply(AICc.tab_list)
-      } else {
-        all.AICc <- rbind(ss.results$AICc,
-                          plyr::ldply(AICc.tab_list))  
-      }
-      
-      all.AICc <- all.AICc %>% 
-        dplyr::arrange(., AICc) %>%
-        dplyr::mutate(., delta.AICc = AICc - min(AICc)) %>%
-        dplyr::mutate(., weight = (exp(-0.5 * delta.AICc)) / sum(exp(-0.5 * delta.AICc))) %>%
-        as.data.frame()
-      
-      
-      # * Bootstrap -----------------------------------------------------
-      
-      if(!is.null(gdist.inputs)) {
-        obs <- gdist.inputs$n.Pops
-        genetic.mat <- matrix(0, obs, obs)
-        genetic.mat[lower.tri(genetic.mat)] <- gdist.inputs$response
-        
-        boot.results <- Resist.boot(mod.names = all.k[,1],
-                                    dist.mat = all.cd,
-                                    n.parameters = all.k[,2],
-                                    sample.prop = sample.prop,
-                                    iters = iters,
-                                    obs = obs,
-                                    genetic.mat = genetic.mat)
-      } else {
-        obs <- jl.inputs$n.Pops
-        genetic.mat <- matrix(0, obs, obs)
-        genetic.mat[lower.tri(genetic.mat)] <- jl.inputs$response.all
-        
-        boot.results <- Resist.boot(mod.names = all.k[,1],
-                                    dist.mat = all.cd,
-                                    n.parameters = all.k[,2],
-                                    sample.prop = sample.prop,
-                                    iters = iters,
-                                    obs = obs,
-                                    genetic.mat = genetic.mat,
-                                    keep = jl.inputs$keep)
-      }
-      
-     
-      
-    } # End scaled if-else
+      boot.results <- Resist.boot(mod.names = all.k[,1],
+                                  dist.mat = all.cd,
+                                  n.parameters = all.k[,2],
+                                  sample.prop = sample.prop,
+                                  iters = iters,
+                                  obs = obs,
+                                  genetic.mat = genetic.mat,
+                                  keep = jl.inputs$keep)
+    }
     
     # Write AICc table and Boot Results to replicate results directory
     write.table(x = all.AICc,

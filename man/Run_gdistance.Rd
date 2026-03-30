@@ -9,8 +9,8 @@ Run_gdistance(gdist.inputs, r, scl = TRUE)
 \arguments{
 \item{gdist.inputs}{Object created by \code{\link[ResistanceGA2]{gdist.prep}}.}
 
-\item{r}{A \code{SpatRaster} object (from the \pkg{terra} package) or the
-path to a raster file readable by \code{terra::rast()}.}
+\item{r}{A single-layer \code{SpatRaster} object (from the \pkg{terra}
+package).}
 
 \item{scl}{Logical. Scale the correction values (default \code{TRUE}). Set
 to \code{FALSE} to obtain absolute distance values. See
@@ -24,14 +24,21 @@ A numeric distance vector (or matrix) of pairwise cost/commute
 Calculates pairwise cost or commute distances across a resistance surface
 using the \code{gdistance} package.
 }
-\examples{
-\dontrun{
-library(terra)
-r <- rast(nrows = 50, ncols = 50, vals = runif(2500))
-coords <- matrix(runif(20, 0, 50), ncol = 2)
-gdist.inputs <- gdist.prep(n.Pops = 10, samples = coords)
-cd <- Run_gdistance(gdist.inputs, r)
+\details{
+\pkg{gdistance} still operates on \pkg{raster} objects. This function keeps
+the public API terra-based by coercing the supplied \code{SpatRaster}
+internally before building the transition object.
 }
+\examples{
+pts <- terra::vect(sample_pops[[1]], type = "points")
+gdist.inputs <- gdist.prep(
+  n.Pops = nrow(sample_pops[[1]]),
+  samples = pts,
+  method = "costDistance"
+)
+
+cd <- Run_gdistance(gdist.inputs, raster_orig[["cont_orig"]])
+length(cd)
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

@@ -29,11 +29,20 @@
 #'                    keep = NULL,
 #'                    n.cores = NULL)
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' boot.out <- Resist.boot(
+#'   mod.names = c("categorical", "continuous"),
+#'   dist.mat = resist_list[1:2],
+#'   n.parameters = c(2, 3),
+#'   sample.prop = 0.6,
+#'   iters = 5,
+#'   obs = nrow(Dc_list[[1]]),
+#'   genetic.mat = Dc_list[[1]]
+#' )
+#'
+#' boot.out
+#' }
 
 Resist.boot <-
   function (mod.names,

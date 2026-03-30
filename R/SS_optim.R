@@ -1,6 +1,7 @@
 #' Single surface optimization
 #'
-#' Optimize all surfaces contained in a directory using a genetic algorithm executed with the \code{\link[GA]{ga}} function in the Genetic Algorithms package \pkg{GA}
+#' Optimize each surface in a \code{SpatRaster} stack using a genetic algorithm
+#' executed with the \code{\link[GA]{ga}} function in \pkg{GA}.
 #'
 #' @param gdist.inputs Object created from running \code{\link[ResistanceGA2]{gdist.prep}} function. Defined if optimizing using gdistance
 #' @param jl.inputs Object created from running \code{\link[ResistanceGA2]{jl.prep}} function. Defined if optimizing using CIRCUITSCAPE run in Julia
@@ -10,7 +11,8 @@
 #' @param diagnostic_plots Plotting and saving of diagnostic plots (Default = TRUE)
 #' @return This function optimizes resistance surfaces in isolation. Following optimization of all surfaces, several summary objects are created.\cr
 #' \enumerate{
-#' \item Diagnostic plots of model fit are output to the "Results/Plots" directory that is automatically generated within the folder containing the optimized ASCII files.
+#' \item Diagnostic plots of model fit are output to the \code{Results/Plots}
+#' directory created beneath \code{Results.dir}.
 #' \item A .csv file with the Maximum Likelihood Population Effects mixed effects model coefficient estimates (MLPE_coeff_Table.csv)
 #' \item Three summary .csv files are generated: CategoricalResults.csv, ContinuousResults.csv, & All_Results_AICc.csv. These tables contain AICc values and optimization summaries for each surface.
 #' }
@@ -26,11 +28,33 @@
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' @export
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' pts <- terra::vect(sample_pops[[1]], type = "points")
+#' gdist.inputs <- gdist.prep(
+#'   n.Pops = nrow(sample_pops[[1]]),
+#'   response = lower(Dc_list[[1]]),
+#'   samples = pts
+#' )
+#'
+#' GA.inputs <- GA.prep(
+#'   raster = raster_orig,
+#'   Results.dir = file.path(tempdir(), "ResistanceGA2-ss"),
+#'   pop.size = 20,
+#'   maxiter = 10,
+#'   run = 5,
+#'   quiet = TRUE,
+#'   monitor = FALSE
+#' )
+#'
+#' ss.out <- SS_optim(
+#'   gdist.inputs = gdist.inputs,
+#'   GA.inputs = GA.inputs,
+#'   dist_mod = FALSE,
+#'   null_mod = FALSE,
+#'   diagnostic_plots = FALSE
+#' )
+#' }
 
 SS_optim <- function(gdist.inputs = NULL,
                      jl.inputs = NULL,
@@ -128,7 +152,8 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- NAME
             
             cd <- Run_gdistance(gdist.inputs, r)
-            scale.cd <- scale(c(cd))
+            dat <- gdist.inputs$df
+            dat$cd <- scale(c(cd))
             
             write.table(
               as.matrix(cd),
@@ -2160,7 +2185,8 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- NAME
             
             cd <- Run_gdistance(gdist.inputs, r)
-            scale.cd <- scale(c(cd))
+            dat <- gdist.inputs$df
+            dat$cd <- scale(c(cd))
             
             write.table(
               as.matrix(cd),
@@ -4119,7 +4145,7 @@ SS_optim <- function(gdist.inputs = NULL,
         } # End Island-Standard ifelse
       } # End no covariates
     } # End julia
-  } # Close ascii loop
+  } # Close raster loop
   
   
   # Optimization summary ----------------------------------------------------

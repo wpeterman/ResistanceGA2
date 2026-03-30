@@ -12,7 +12,8 @@ MLPE.lmm(resistance,
                 scale = TRUE)
 }
 \arguments{
-\item{resistance}{Path to pairwise resistance distance matrix (resistances.out) from CS results. Alternatively, provide the pairwise resistances created from optimizing with `gdistance` (result of Run_gdistance).}
+\item{resistance}{Path to a Circuitscape resistance output file, or a
+vector, matrix, or \code{dist} object of pairwise resistance distances.}
 
 \item{pairwise.genetic}{Lower half of pairwise genetic distance matrix}
 
@@ -34,11 +35,14 @@ Runs MLPE as detailed by Clarke et al. (2002). This function will run the model 
 An AIC value will only be returned if \code{REML = FALSE}
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
+\dontrun{
+fit <- MLPE.lmm(
+  resistance = lower(resist_list[[1]]),
+  pairwise.genetic = lower(Dc_list[[1]])
+)
 
-## End (Not run)
+summary(fit)
+}
 }
 \references{
 Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. Journal of Agricultural, Biological, and Environmental Statistics 7:361-372.

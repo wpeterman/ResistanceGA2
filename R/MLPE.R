@@ -3,7 +3,8 @@
 #'
 #' Runs MLPE as detailed by Clarke et al. (2002). This function will run the model and return lmer object
 #'
-#' @param resistance Path to pairwise resistance distance matrix (resistances.out) from CS results. Alternatively, provide the pairwise resistances created from optimizing with `gdistance` (result of Run_gdistance).
+#' @param resistance Path to a Circuitscape resistance output file, or a
+#'   vector, matrix, or \code{dist} object of pairwise resistance distances.
 #' @param pairwise.genetic Lower half of pairwise genetic distance matrix
 #' @param REML Logical. If TRUE, mixed effects model will be fit using restricted maximum likelihood. Default = FALSE
 #' @param ID The to_from ID list for the MLPE model. The function will automatically create this object, but it can be specified directly from the output of \code{gdist.prep} or \code{jl.prep} (Default = NULL)
@@ -23,11 +24,15 @@
 #' @references Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. Journal of Agricultural, Biological, and Environmental Statistics 7:361-372.
 #' 
 #' 
-#' @examples  
-#' ## Not run:
-#' ## *** TO BE COMPLETED *** ##
-#' 
-#' ## End (Not run)
+#' @examples
+#' \dontrun{
+#' fit <- MLPE.lmm(
+#'   resistance = lower(resist_list[[1]]),
+#'   pairwise.genetic = lower(Dc_list[[1]])
+#' )
+#'
+#' summary(fit)
+#' }
 
 MLPE.lmm <-
   function(resistance,

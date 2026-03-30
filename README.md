@@ -23,6 +23,12 @@ Once the package is installed, you can view the 'Getting Started' vignette in R.
 
 -   This is large and ongoing update. `terra` is now fully (and only) supported. There is also a switch away from `JuliaCall` to `JuliaConnectoR`. Please make me aware of issues / errors as you encounter them.
 
+-   Public spatial inputs are now terra-only: resistance surfaces should be supplied as `terra::SpatRaster` objects and sample locations as `terra::SpatVector` point layers. `gdistance` support is retained, with internal conversion to the raster classes that package still requires.
+
+-   The standalone Circuitscape `.exe` workflow is no longer supported. Circuitscape runs are handled through Julia and `JuliaConnectoR`.
+
+-   For continuous surfaces, it is strongly recommended that transformation searches be restricted to Monomolecular families unless there is a strong biological or ecological reason to expect a unimodal or quadratic-type relationship. Exploring Ricker families more broadly can increase the risk of overfitting.
+
 -   It is highly recommended that you install Julia and the CIRCUITSCAPE Julia package. General instructions [**here**](https://petermanresearch.weebly.com/uploads/2/5/9/2/25926970/julia_guide.pdf "Julia Guide"). There is also a `Julia_Guide` vignette with the package now.
 
 ------------------------------------------------------------------------

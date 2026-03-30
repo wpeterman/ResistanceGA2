@@ -7,7 +7,9 @@
 Diagnostic.Plots(resistance.mat, genetic.dist, XLAB,YLAB, plot.dir, type, name, ID, ZZ)
 }
 \arguments{
-\item{resistance.mat}{Path to CIRCUITSCAPE "_resistances.out" file, or costDistance object created from running gdistance}
+\item{resistance.mat}{Path to a Circuitscape resistance output file, or a
+matrix/vector of pairwise resistance distances such as the output from
+\code{\link{Run_gdistance}}.}
 
 \item{genetic.dist}{Vector of pairwise genetic distances (lower half of pairwise matrix). Can be accessed from \code{gdist.inputs$response} or \code{jl.inputs$response}}
 
@@ -32,11 +34,15 @@ A multipanel panel .tif including histogram of residuals and qqplot of fitted mi
 This function will generate mixed effect model diagnostic plots following optimization
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
-
-## End (Not run)
+\dontrun{
+Diagnostic.Plots(
+  resistance.mat = resist_list[[1]],
+  genetic.dist = lower(Dc_list[[1]]),
+  plot.dir = paste0(normalizePath(tempdir(), winslash = "/"), "/"),
+  type = "categorical",
+  name = "example"
+)
+}
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

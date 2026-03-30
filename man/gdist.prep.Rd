@@ -24,10 +24,7 @@ gdist.prep(
 \item{response}{Vector of pairwise genetic distances (lower half of pairwise
 matrix).}
 
-\item{samples}{Either the path to a tab-delimited .txt file containing xy
-coordinates (columns 2 and 3, first column ignored), a two-column matrix
-with x values in column 1 and y values in column 2, or a
-\code{\link[terra]{SpatVector}} of points.}
+\item{samples}{A \code{\link[terra]{SpatVector}} of sample point locations.}
 
 \item{covariates}{Data frame of additional covariates to include in the MLPE
 model during optimization.}
@@ -69,20 +66,22 @@ A named list of inputs required by the optimization functions.
 Creates a necessary input for optimizing resistance surfaces based on
 pairwise cost distances, implemented using the \code{gdistance} library.
 }
+\details{
+Sample locations must be supplied as a point \code{SpatVector}. When
+\code{\link{Run_gdistance}} is called, the resistance surface is converted
+internally to the raster class required by \pkg{gdistance}.
+}
 \examples{
-\dontrun{
-# Create sample data
-set.seed(42)
-coords <- matrix(runif(20, 0, 100), ncol = 2)
-gd <- runif(choose(10, 2))
+pts <- terra::vect(sample_pops[[1]], type = "points")
 
 gdist.inputs <- gdist.prep(
-  n.Pops = 10,
-  response = gd,
-  samples = coords,
+  n.Pops = nrow(sample_pops[[1]]),
+  response = lower(Dc_list[[1]]),
+  samples = pts,
   method = "commuteDistance"
 )
-}
+
+head(gdist.inputs$df)
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

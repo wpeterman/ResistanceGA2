@@ -1,0 +1,439 @@
+---
+title: "ResistanceGA2: Terra-Based Workflows"
+author: "Bill Peterman"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: rmarkdown::html_vignette
+vignette: |
+  %\VignetteIndexEntry{ResistanceGA2: Terra-Based Workflows}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(ResistanceGA2)
+library(terra)
+```
+
+# Background
+
+`ResistanceGA2` is the terra-based continuation of the original
+`ResistanceGA` framework for optimizing resistance surfaces with genetic
+algorithms. The core idea is unchanged from the approach first laid out in
+Peterman et al. (2014) and later formalized for the package in Peterman
+(2018): rather than assigning resistance values entirely from expert opinion
+or searching only a small grid of candidate values, the package uses
+stochastic optimization to search a much broader parameter space and identify
+surfaces that best explain pairwise genetic differentiation.
+
+That framework is useful for continuous surfaces, categorical surfaces, and
+multiple-surface hypotheses. Continuous layers can be transformed through
+parameterized response curves, categorical layers can have class-specific
+resistance values estimated, and multisurface models can combine several
+hypothesized drivers into a single composite surface. The current package keeps
+that modeling framework but modernizes the implementation so that the package 
+uses `terra`, Circuitscape is run through Julia with `JuliaConnectoR`, and
+`gdistance` remains available through internal raster conversion.
+
+Resistance distances can now be calculated in two main ways. `gdistance`
+supports least-cost path distances with `costDistance()` and random-walk
+commute-time distances with `commuteDistance()`. Julia/Circuitscape provides
+pairwise resistance distances and current maps. In practice, `gdistance` is
+often the most convenient starting point for iterative optimization because it
+stays inside R and is usually faster for repeated model fitting, while
+Julia/Circuitscape remains essential when you need direct Circuitscape output
+or cumulative current maps.
+
+This is still a model-based and computationally intensive workflow. Runtime
+depends on raster size, number of sample locations, number of surfaces,
+transformation space, and optimizer settings. You must think carefully about 
+biological realism, raster resolution, and sampling design before launching 
+large search spaces. If you plan to interpret resistance distances or current 
+flow biologically, it is worth also reading the broader resistance-modeling and
+circuit-theory literature rather than treating the package as a black box.
+
+The practical interface in `ResistanceGA2` is simpler than the legacy package.
+
+- Resistance surfaces should be supplied as `SpatRaster` objects.
+- Sample locations should be supplied as point `SpatVector` objects.
+- `gdistance` is still supported, but raster conversion happens internally.
+- Circuitscape is supported through Julia and `JuliaConnectoR`, not through the standalone `.exe`.
+- The old kernel-smoothing / `kernel.scale` workflow has been removed.
+
+This vignette focuses on the current package framework rather than the legacy
+file-based workflow.
+
+# Thoughts on Optimization
+
+There are three objective functions available in `GA.prep()`: `"AIC"`,
+`"R2"`, and `"LL"`. The default in `ResistanceGA2` is still log-likelihood
+(`method = "LL"`), and that is usually the best place to start. `R2` is
+intuitive, but in practice it is often not sensitive enough to provide a clean
+objective surface for the genetic algorithm. Recent simulations have also called into question the use of R-squared (Beninde et al. 2024, Molec Eco Res). AIC- and AICc-based criteria can
+still be useful for comparing fitted models, but they depend on assumptions
+about effective sample size and model complexity that are not fully
+straightforward for pairwise MLPE models.
+
+That ambiguity matters most when deciding how to count `k`, the number of
+parameters used in AIC/AICc calculations. The fitted MLPE model always contains
+a single fixed-effect resistance term, but the resistance distances themselves
+may have been produced by optimizing several underlying parameters. Continuous
+surfaces estimate a transformation family plus shape and maximum resistance;
+categorical surfaces estimate multiple class-specific values; multisurface
+models combine information from several layers into a single composite
+predictor. Because of that, there is no universally accepted way to count `k`
+in this setting.
+
+`ResistanceGA2` keeps that uncertainty explicit by allowing `k.value` to
+control how model complexity is counted. Different defensible choices can lead
+to different AIC/AICc penalties, so users should report which option they used
+and why. The default `k.value = 2` is a practical starting point, but it
+should not be treated as uniquely correct for every study design.
+
+A useful general strategy is to begin with simpler, biologically plausible
+hypotheses and only expand the search space when the data and system justify
+it. Repeated runs should recover broadly similar results if the signal is
+strong. It is also highly recommended that continuous transformations be
+restricted to the Monomolecular families unless there is a strong biological or
+ecological reason to expect a unimodal or quadratic-type relationship. Ricker
+transformations are more flexible, but that flexibility also increases the risk
+of overfitting.
+
+When choosing between distance engines, `gdistance::commuteDistance()` is often
+a good default for iterative model fitting because it captures the same
+random-walk style logic as Circuitscape resistance distance while remaining
+fast and easy to run inside R. Julia/Circuitscape is still valuable when you
+need direct Circuitscape outputs, want to produce current maps, or need to
+match an existing Circuitscape-based workflow more closely. In either case, it
+is best to treat optimization as one step in a broader inference process rather
+than as a fully automated truth-finding procedure.
+
+# Example Data
+
+The package includes example resistance surfaces, sample locations, and genetic-distance matrices.
+
+```{r example-data}
+pts <- vect(sample_pops[[1]], type = "points")
+gd <- lower(Dc_list[[1]])
+pts_small <- vect(samples[, 2:3], type = "points")
+
+pts
+pts_small
+raster_orig
+```
+
+`sample_pops` is stored as coordinate matrices for convenience, but the current workflow converts those coordinates to `SpatVector` objects before analysis.
+
+For the expensive distance-engine examples below, this vignette uses packaged,
+precomputed outputs generated from the smaller `samples` point set and the
+`resistance_surfaces[["continuous"]]` layer. That keeps the vignette fast to
+render and avoids requiring Julia during documentation builds. The builder
+script used to refresh those objects lives in `data-raw/build_vignette_outputs.R`.
+
+# Prepare Optimization Inputs
+
+## Genetic Algorithm Settings
+
+`GA.prep()` now expects a `SpatRaster` supplied through the `raster` argument.
+
+For continuous surfaces, the recommended default is to restrict transformation
+searches to the Monomolecular families. Ricker families should usually only be
+explored when there is a strong biological or ecological basis for a unimodal
+or quadratic-type relationship; otherwise, their added flexibility can increase
+the risk of overfitting.
+
+```{r ga-prep, message=FALSE, warning=FALSE}
+ga_inputs <- GA.prep(
+  raster = raster_orig,
+  Results.dir = file.path(tempdir(), "ResistanceGA2-vignette"),
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+ga_inputs$layer.names
+ga_inputs$surface.type
+```
+
+In practice, this means many analyses should keep `select.trans` at its default
+Monomolecular-only behavior or specify `list("M", ...)` explicitly for
+continuous layers.
+
+## Pairwise Distances with gdistance
+
+Use `gdist.prep()` when you want to optimize against least-cost or commute-time distances.
+
+```{r gdist-prep, warning=FALSE}
+gdist_demo_inputs <- gdist.prep(
+  n.Pops = nrow(samples),
+  samples = pts_small,
+  method = "costDistance"
+)
+
+names(gdist_demo_inputs)
+```
+
+You can also calculate a distance matrix directly from a resistance surface.
+The matrix shown here is precomputed and shipped with the package.
+
+```{r run-gdistance}
+cd_matrix <- vignette_pairwise_outputs$gdistance_commute
+
+dim(cd_matrix)
+```
+
+To reproduce that object manually:
+
+```{r run-gdistance-live, eval=FALSE}
+cd_matrix <- Run_gdistance(
+  gdist.inputs = gdist_demo_inputs,
+  r = resistance_surfaces[["continuous"]]
+)
+```
+
+## Pairwise Distances with Circuitscape in Julia
+
+Use `jl.prep()` when you want to run Circuitscape through Julia. This requires a working Julia installation plus the `Circuitscape` Julia package.
+
+```{r jl-prep, eval=FALSE}
+jl_inputs <- jl.prep(
+  n.Pops = nrow(samples),
+  CS_Point.File = pts_small,
+  JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
+  run_test = FALSE
+)
+```
+
+The packaged vignette outputs also include a precomputed pairwise Circuitscape
+result generated from the same surface and sample locations.
+
+```{r jl-precomputed}
+cs_result <- vignette_pairwise_outputs$circuitscape_matrix
+
+length(cs_result)
+head(cs_result)
+```
+
+# Optimization Workflows
+
+## Single-Surface Optimization
+
+```{r ss-optim, eval=FALSE}
+ss_out <- SS_optim(
+  gdist.inputs = gdist_inputs,
+  GA.inputs = ga_inputs,
+  dist_mod = FALSE,
+  null_mod = FALSE,
+  diagnostic_plots = FALSE
+)
+```
+
+## Multi-Surface Optimization
+
+```{r ms-optim, eval=FALSE}
+ms_out <- MS_optim(
+  gdist.inputs = gdist_inputs,
+  GA.inputs = ga_inputs,
+  diagnostic_plots = FALSE
+)
+```
+
+If you want to reconstruct the optimized composite surface after a multisurface run:
+
+```{r combine-surfaces, eval=FALSE}
+combined_surface <- Combine_Surfaces(
+  PARM = ms_out$GA.summary@solution[1, ],
+  gdist.inputs = gdist_inputs,
+  GA.inputs = ga_inputs
+)
+```
+
+## All-Combinations Analysis
+
+For `all_comb()`, create the GA settings with `Results.dir = "all.comb"` and provide a separate directory where outputs should be written. That output directory will be created automatically when needed.
+
+```{r all-comb, eval=FALSE}
+ga_allcomb <- GA.prep(
+  raster = raster_orig,
+  Results.dir = "all.comb",
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+results_dir <- file.path(tempdir(), "ResistanceGA2-all-comb")
+
+combo_out <- all_comb(
+  gdist.inputs = gdist_inputs,
+  GA.inputs = ga_allcomb,
+  results.dir = results_dir,
+  max.combination = 2,
+  iters = 10,
+  replicate = 1
+)
+```
+
+# Working with Transformations
+
+The package still provides the transformation utilities used during
+optimization. These are useful for inspecting the shape of hypothesized
+relationships before running a full search.
+
+The figure below recreates the eight non-flat transformation families using a
+common illustrative parameter set (`shape = 2.5`, `max = 100`) across the
+range of the example continuous surface. The goal is to show the geometry of
+the available curve families, not to imply that these are the parameter values
+that should be used in an analysis. The flat Distance transformation is not
+shown because it simply assigns a constant resistance of 1 everywhere.
+
+```{r transformation-families, fig.width=12, fig.height=7, fig.cap="Illustrative transformation families available for continuous resistance surfaces. All panels use the same shape and maximum parameters to emphasize differences in curve geometry."}
+scale_vector <- function(x, min_out, max_out) {
+  ((x - min(x)) * (max_out - min_out) / (max(x) - min(x))) + min_out
+}
+
+transform_curve <- function(transformation, x, shape, max_value) {
+  if (transformation == "Inverse-Reverse Monomolecular") {
+    y <- -max_value * (1 - exp(-x / shape)) - 1
+    rev(scale_vector(y, abs(max(y)), abs(min(y))))
+  } else if (transformation == "Inverse-Reverse Ricker") {
+    y <- -(max_value * x * exp(-x / shape)) - 1
+    rev(scale_vector(y, abs(max(y)), abs(min(y))))
+  } else if (transformation == "Monomolecular") {
+    max_value * (1 - exp(-x / shape)) + 1
+  } else if (transformation == "Ricker") {
+    max_value * x * exp(-x / shape) + 1
+  } else if (transformation == "Reverse Monomolecular") {
+    y <- max_value * (1 - exp(-x / shape)) + 1
+    rev(y)
+  } else if (transformation == "Reverse Ricker") {
+    y <- max_value * x * exp(-x / shape) + 1
+    rev(y)
+  } else if (transformation == "Inverse Monomolecular") {
+    y <- -max_value * (1 - exp(-x / shape)) - 1
+    scale_vector(y, abs(max(y)), abs(min(y)))
+  } else if (transformation == "Inverse Ricker") {
+    y <- -(max_value * x * exp(-x / shape)) - 1
+    scale_vector(y, abs(max(y)), abs(min(y)))
+  } else {
+    stop("Unknown transformation: ", transformation)
+  }
+}
+
+curve_names <- c(
+  "Inverse-Reverse Monomolecular",
+  "Inverse-Reverse Ricker",
+  "Monomolecular",
+  "Ricker",
+  "Reverse Monomolecular",
+  "Reverse Ricker",
+  "Inverse Monomolecular",
+  "Inverse Ricker"
+)
+
+curve_params <- list(shape = 2.5, max_value = 100)
+range_stats <- terra::global(raster_orig[["cont_orig"]], c("min", "max"), na.rm = TRUE)
+original_values <- seq(range_stats$min, range_stats$max, length.out = 200)
+scaled_values <- scale_vector(original_values, 0, 10)
+
+curve_data <- do.call(
+  rbind,
+  lapply(curve_names, function(name) {
+    data.frame(
+      original = original_values,
+      transformed = transform_curve(
+        transformation = name,
+        x = scaled_values,
+        shape = curve_params$shape,
+        max_value = curve_params$max_value
+      ),
+      transformation = name
+    )
+  })
+)
+
+curve_data$transformation <- factor(curve_data$transformation, levels = curve_names)
+
+ggplot2::ggplot(curve_data, ggplot2::aes(x = original, y = transformed)) +
+  ggplot2::geom_line(linewidth = 0.9) +
+  ggplot2::facet_wrap(~ transformation, ncol = 4, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(
+    x = "Original data values",
+    y = "Transformed resistance values"
+  ) +
+  ggplot2::theme(
+    strip.text = ggplot2::element_text(face = "bold", size = 9),
+    axis.text = ggplot2::element_text(size = 9),
+    axis.title = ggplot2::element_text(size = 10)
+  )
+```
+
+Monomolecular families are usually the best default because they are easier to
+interpret and generally less prone to overfitting. Ricker families are helpful
+when there is a strong biological reason to expect a peak or threshold-like
+response, but they should usually be explored more cautiously. During
+optimization, very large shape values for Ricker-family transformations are
+collapsed to the flat Distance solution, because those curves can otherwise
+approximate monomolecular behavior while adding unnecessary flexibility.
+
+```{r plot-trans}
+Plot.trans(
+  PARM = c(2.5, 100),
+  Resistance = raster_orig[["cont_orig"]],
+  transformation = "Monomolecular",
+  marginal.plot = FALSE
+)
+```
+
+You can also apply a transformation directly to a raster:
+
+```{r resistance-tran}
+transformed_surface <- Resistance.tran(
+  transformation = "Monomolecular",
+  shape = 2.5,
+  max = 100,
+  r = raster_orig[["cont_orig"]]
+)
+
+transformed_surface
+```
+
+# Current Circuitscape Runs
+
+The current map shown below is precomputed and stored as package data so the
+vignette can render quickly and reproducibly.
+
+```{r current-map}
+vignette_current_map
+```
+
+To reproduce either the pairwise resistance distances or the current map
+directly from Julia:
+
+```{r run-julia, eval=FALSE}
+cs_result <- Run_CS.jl(
+  jl.inputs = jl_inputs,
+  r = resistance_surfaces[["continuous"]]
+)
+
+current_map <- Run_CS.jl(
+  jl.inputs = jl_inputs,
+  r = resistance_surfaces[["continuous"]],
+  CurrentMap = TRUE,
+  output = "raster",
+  EXPORT.dir = results_dir
+)
+```
+
+# Migration Notes
+
+The original `ResistanceGA` package relied on workflows that are no longer part of `ResistanceGA2`.
+
+- Do not pass directories of `.asc` files as user input.
+- Do not pass `sp` classes such as `SpatialPoints`.
+- Do not use `JuliaCall` or `XRJulia`.
+- Do not use the standalone Circuitscape executable.
+- Do not use the old smoothing workflow based on `scale = TRUE` or `k.smooth()`.
+
+If you keep those changes in mind, the modern workflow is mostly a matter of preparing terra objects up front and choosing whether the distance engine should be `gdistance` or Julia/Circuitscape.

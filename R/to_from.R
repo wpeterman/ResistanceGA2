@@ -6,9 +6,7 @@
 #'   of individuals sampled at each population. Only needed when converting
 #'   from population- to individual-level analysis.
 #' @param spLoc Sample locations, used to add a spatial-proximity random effect.
-#'   Accepts a two-column coordinate matrix (x, y), a
-#'   \code{\link[terra]{SpatVector}} of points, or a path to a tab-delimited
-#'   file (site, x, y) in Circuitscape format. Requires \code{nb}.
+#'   Provide a \code{\link[terra]{SpatVector}} of points. Requires \code{nb}.
 #' @param nb Maximum distance (in the same units as \code{spLoc}) below which
 #'   locations are considered to be in the same neighborhood. Must be specified
 #'   when \code{spLoc} is provided.
@@ -32,8 +30,8 @@
 #' ## Expand pairwise distances
 #' To.From.ID(sampled_pops = 4, pop_n = c(1, 2, 3, 1), dist = runif(6))
 #'
-#' ## Spatial-proximity random effect via coordinate matrix
-#' spLoc <- cbind(c(1, 2, 9, 10), c(1, 2, 9, 10))
+#' ## Spatial-proximity random effect via SpatVector points
+#' spLoc <- terra::vect(cbind(c(1, 2, 9, 10), c(1, 2, 9, 10)), type = "points")
 #' To.From.ID(sampled_pops = 4, spLoc = spLoc, nb = 3)
 #'
 #' @export
@@ -66,16 +64,7 @@ To.From.ID <- function(sampled_pops,
 
   # Normalise spLoc to a coordinate matrix ----------------------------------
   if (!is.null(spLoc)) {
-    if (inherits(spLoc, "SpatVector")) {
-      spLoc <- terra::crds(spLoc)
-    } else if (is.character(spLoc) && file.exists(spLoc)) {
-      raw   <- read.delim(spLoc, header = FALSE)
-      spLoc <- as.matrix(raw[, 2:3])
-    } else if (is.data.frame(spLoc)) {
-      spLoc <- as.matrix(spLoc)
-    } else if (!is.matrix(spLoc)) {
-      stop("'spLoc' must be a coordinate matrix, SpatVector, data frame, or file path.")
-    }
+    spLoc <- .point_coords(spLoc, arg = "spLoc")
   }
   
   if(!is.null(pop_n)) {
@@ -191,8 +180,7 @@ To.From.ID <- function(sampled_pops,
                              pop2.pop = pop.ID$pop2,
                              cor.grp = pop.ID$cor.grp,
                              corr_ = pop.ID$corr_,
-                             pop.df = pop,
-                             cor.df = cor.df)
+                             pop = pop)
       } else {
         ind.ID <- data.frame(pop1.ind = factor(lower(ind.colmat)),
                              pop2.ind = factor(lower(ind.rowmat)),

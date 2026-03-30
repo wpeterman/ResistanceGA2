@@ -4,6 +4,11 @@
 .Ruserdata
 inst/doc
 .Rcheck/
+*.Rcheck/
 .claude/
+vignettes/*.R
 vignettes/*.html
+vignettes/*.pdf
 *.tar.gz
+/doc/
+/Meta/

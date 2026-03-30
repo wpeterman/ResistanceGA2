@@ -46,11 +46,19 @@ This is a 'pseudo' bootstrap procedure that will subsample a specified proportio
 This is a 'pseudo' bootstrap procedure that subsamples distance and genetic matrices, refits the MLPE model for each surface. AICc is calculated based on the number of parameters specified. Ranking of models during the bootstrap analysis is based on the specified \code{rank.method}, which defaults to 'AICc'. The objective of this procedure is to identify the surface that is top ranked across all bootstrap iterations.
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
+\dontrun{
+boot.out <- Resist.boot(
+  mod.names = c("categorical", "continuous"),
+  dist.mat = resist_list[1:2],
+  n.parameters = c(2, 3),
+  sample.prop = 0.6,
+  iters = 5,
+  obs = nrow(Dc_list[[1]]),
+  genetic.mat = Dc_list[[1]]
+)
 
-## End (Not run)
+boot.out
+}
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

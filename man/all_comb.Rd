@@ -18,13 +18,21 @@ all_comb(gdist.inputs = NULL,
                 ...)
 }
 \arguments{
-\item{gdist.inputs}{Object created from running \code{\link[ResistanceGA2]{gdist.prep}} function. Defined if optimizing using gdistance}
+\item{gdist.inputs}{Object created from running
+\code{\link[ResistanceGA2]{gdist.prep}}. Supply when optimizing with
+\pkg{gdistance}.}
 
-\item{jl.inputs}{Object created from running \code{\link[ResistanceGA2]{jl.prep}} function. Defined if optimizing using CIRCUITSCAPE run in Julia}
+\item{jl.inputs}{Object created from running
+\code{\link[ResistanceGA2]{jl.prep}}. Supply when optimizing with
+Circuitscape in Julia.}
 
-\item{GA.inputs}{Object created from running \code{\link[ResistanceGA2]{GA.prep}} function. Be sure that the \code{Results.dir} has been been correctly specified as "all.comb"}
+\item{GA.inputs}{Object created from running
+\code{\link[ResistanceGA2]{GA.prep}}. Be sure that
+\code{Results.dir = "all.comb"} was used when creating this object.}
 
-\item{results.dir}{Directory to write and save analysis results. This should be an empty directory. Any existing files located in this directory will be deleted!}
+\item{results.dir}{Directory to write and save analysis results. If the
+directory does not exist, it will be created automatically. Any existing
+files located in this directory may be deleted after confirmation.}
 
 \item{max.combination}{The maximum number of surfaces to include in the all combinations analysis (Default = 4). Alternatively, specify a vector with the minimum and maximum number of surfaces to combine (e.g., c(2,4). If the minimum > 1, then the single surface optimization will be skipped.}
 
@@ -46,14 +54,40 @@ all_comb(gdist.inputs = NULL,
 This function optimizes resistance surfaces in isolation using \code{\link[ResistanceGA2]{SS_optim}}, followed by multisurface optimization using \code{\link[ResistanceGA2]{MS_optim}}, and then conducts a bootstrap analysis.
 }
 \description{
-A wrapper function to run both \code{\link[ResistanceGA2]{SS_optim}} and \code{\link[ResistanceGA2]{MS_optim}} to optimize all combinations of resistance surfaces with the Genetic Algorithms package \pkg{GA}. Following optimization, \code{\link[ResistanceGA2]{Resist.boot}} is run to conduct a bootstrap analysis.  This function can only be used when optimizing resistance surface with least cost path or commute distance (\pkg{gdistance}).
+A wrapper function to run both \code{\link[ResistanceGA2]{SS_optim}} and
+\code{\link[ResistanceGA2]{MS_optim}} to optimize all combinations of
+resistance surfaces with the Genetic Algorithms package \pkg{GA}. Following
+optimization, \code{\link[ResistanceGA2]{Resist.boot}} is run to conduct a
+bootstrap analysis.
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
+\dontrun{
+pts <- terra::vect(sample_pops[[1]], type = "points")
+gd <- lower(Dc_list[[1]])
 
-## End (Not run)
+gdist.inputs <- gdist.prep(
+  n.Pops = nrow(sample_pops[[1]]),
+  response = gd,
+  samples = pts
+)
+
+GA.inputs <- GA.prep(
+  raster = raster_orig,
+  Results.dir = "all.comb",
+  quiet = TRUE
+)
+
+results_dir <- file.path(tempdir(), "ResistanceGA2-all-comb")
+
+combo.out <- all_comb(
+  gdist.inputs = gdist.inputs,
+  GA.inputs = GA.inputs,
+  results.dir = results_dir,
+  max.combination = 2,
+  iters = 10,
+  replicate = 1
+)
+}
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

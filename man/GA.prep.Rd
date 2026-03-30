@@ -4,7 +4,7 @@
 \alias{GA.prep}
 \title{Create R object with genetic algorithm optimization settings}
 \usage{
-GA.prep(ASCII.dir,
+GA.prep(raster,
                Results.dir = NULL,
                min.cat = NULL,
                max.cat = 1000,
@@ -47,9 +47,14 @@ GA.prep(ASCII.dir,
                quiet = FALSE)
 }
 \arguments{
-\item{ASCII.dir}{Directory containing \code{.asc} raster files, or a \code{SpatRaster} (from \pkg{terra}) with one or more layers.}
+\item{raster}{A \code{SpatRaster} (from \pkg{terra}) with one or more layers.}
 
-\item{Results.dir}{Directory to export optimization results. If the directory does not exist, you will be prompted to create it (or it will be created automatically in non-interactive sessions). If it exists and is not empty, a message will note that existing results may be overwritten. It is critical that there are NO SPACES in the directory path. If using the \code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir} as \code{"all_comb"}.}
+\item{Results.dir}{Directory to export optimization results. If the directory
+does not exist, it will be created automatically. If it exists and is not
+empty, a message will note that existing results may be overwritten. It is
+critical that there are NO SPACES in the directory path. If using the
+\code{\link[ResistanceGA2]{all_comb}} function, specify \code{Results.dir}
+as \code{"all_comb"}.}
 
 \item{min.cat}{The minimum value to be assessed during optimization of categorical resistance surfaces (Default = 1 / max.cat)}
 
@@ -63,7 +68,9 @@ GA.prep(ASCII.dir,
 
 \item{cont.shape}{A vector of hypothesized relationships that each continuous resistance surface will have in relation to the genetic distance response (Default = NULL; see details)}
 
-\item{select.trans}{Option to specify which transformations are applied to continuous surfaces. Must be provided as a list. "A" = All, "M" = Monomolecular only, "R" = Ricker only. Default = "M"; see Details.}
+\item{select.trans}{Option to specify which transformations are applied to
+continuous surfaces. Must be provided as a list. "A" = All, "M" =
+Monomolecular only, "R" = Ricker only. Default = "M"; see Details.}
 
 \item{cat.levels}{Number of unique levels to permit in categorical surface (Default = 15). See Details}
 
@@ -144,13 +151,29 @@ An R object that is a required input into optimization functions
 This function prepares and compiles objects and commands for optimization with the GA package
 }
 \details{
-Only files that you wish to optimize, either in isolation or simultaneously, should be included in the specified \code{ASCII.dir}. If you wish to optimize different combinations of surfaces, different directories containing these surfaces must be created. It is preferable to provide a RasterStack.
+Provide the resistance surfaces directly as a \code{SpatRaster}. If
+multiple surfaces are to be optimized, include them as layers in that
+object. File-path and directory-based raster inputs are no longer accepted.
 
 The Default for \code{k.value} is 2, which sets k equal to the number of parameters optimized, plus 1 for the intercept term. Prior to version 3.0-0, \code{k.value} could not be specified by the user and followed setting 2, such that k was equal to the number of parameters optimized plus the intercept term.
 
 \code{cont.shape} can take values of "Increase", "Decrease", or "Peaked". If you believe a resistance surface is related to your response in a particular way, specifying this here may decrease the time to optimization. \code{cont.shape} is used to generate an initial set of parameter values to test during optimization. If specified, a greater proportion of the starting values will include your believed relationship. If unspecified (the Default), a completely random set of starting values will be generated.
 
-If it is desired that only certain transformations be assessed for continuous surfaces, then this can be specified using \code{select.trans}. By default, only monomolecular transformations will be assessed for continuous surfaces unless otherwise specified. Specific transformations can be specified by providing a vector of values (e.g., \code{c(1,3,5)}), with values corresponding to the equation numbers as detailed in \code{\link[ResistanceGA2]{Resistance.tran}}. If multiple rasters are to be optimized from the same directory, then a list of transformations must be provided in the order that the raster surfaces will be assessed. For example:\cr
+If it is desired that only certain transformations be assessed for
+continuous surfaces, then this can be specified using
+\code{select.trans}. By default, only monomolecular transformations
+will be assessed for continuous surfaces unless otherwise specified.
+This default is also the recommended starting point for most analyses:
+monomolecular families are usually easier to interpret and generally
+reduce the risk of overfitting relative to Ricker families. Ricker
+transformations should usually be explored only when there is a strong
+biological or ecological justification for a unimodal or quadratic-type
+relationship. Specific transformations can be specified by providing a
+vector of values (e.g., \code{c(1,3,5)}), with values corresponding to the
+equation numbers as detailed in \code{\link[ResistanceGA2]{Resistance.tran}}.
+If multiple rasters are to be optimized from the same \code{SpatRaster}
+object, then a list of transformations must be provided in the order that
+the raster surfaces will be assessed. For example:\cr
 \code{select.trans = list("M", "A", "R", c(5,6))}\cr
 will result in surface one only being optimized with Monomolecular transformations, surface two with all transformations, surface three with only Ricker transformations, and surface four with Reverse Ricker and Reverse Monomolecular only. If a categorical surface is among the rasters to be optimized, it is necessary to specify \code{NA} to accommodate this.
 
@@ -161,11 +184,14 @@ Setting \code{gaisl = TRUE} has the potential greatly reduce the optimization ru
 It is recommended to first run GA optimization with the default settings
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
+ga.inputs <- GA.prep(
+  raster = raster_orig,
+  Results.dir = file.path(tempdir(), "ResistanceGA2-example"),
+  quiet = TRUE,
+  monitor = FALSE
+)
 
-## End (Not run)
+ga.inputs$layer.names
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

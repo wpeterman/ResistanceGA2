@@ -23,11 +23,30 @@ A named list with GA summary, MLPE model, AICc table, distance matrices,
 Optimize multiple resistance surfsaces simultaneously using genetic algorithms
 }
 \examples{
- 
-## Not run:
-## *** TO BE COMPLETED *** ##
+\dontrun{
+pts <- terra::vect(sample_pops[[1]], type = "points")
+gdist.inputs <- gdist.prep(
+  n.Pops = nrow(sample_pops[[1]]),
+  response = lower(Dc_list[[1]]),
+  samples = pts
+)
 
-## End (Not run)
+GA.inputs <- GA.prep(
+  raster = raster_orig,
+  Results.dir = file.path(tempdir(), "ResistanceGA2-ms"),
+  pop.size = 20,
+  maxiter = 10,
+  run = 5,
+  quiet = TRUE,
+  monitor = FALSE
+)
+
+ms.out <- MS_optim(
+  gdist.inputs = gdist.inputs,
+  GA.inputs = GA.inputs,
+  diagnostic_plots = FALSE
+)
+}
 }
 \author{
 Bill Peterman <Peterman.73@osu.edu>

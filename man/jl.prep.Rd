@@ -34,10 +34,8 @@ jl.prep(
 matrix). If using \code{pairs_to_include}, provide the full lower-half
 vector; it will be trimmed automatically.}
 
-\item{CS_Point.File}{One of: (1) a \code{\link[terra]{SpatVector}} of sample
-point locations, (2) the path to a tab-delimited Circuitscape point file
-(three columns: site ID, x, y), or (3) the path to an \code{.asc} raster
-whose non-NA cells identify sample locations.}
+\item{CS_Point.File}{A \code{\link[terra]{SpatVector}} of sample point
+locations.}
 
 \item{covariates}{Data frame of additional covariates for the MLPE model.}
 
@@ -75,7 +73,8 @@ Default = \code{FALSE}.}
 continuing? Default = \code{TRUE}.}
 
 \item{write.files}{Directory path. If provided, the \code{.ini} and
-\code{.asc} files used in each Circuitscape run are saved there.}
+\code{.asc} files used in each Circuitscape run are saved there. If the
+directory does not exist, it will be created automatically.}
 
 \item{write.criteria}{Minimum run time (seconds) threshold for writing files
 when \code{write.files} is set. If \code{NULL}, all runs are written.}
@@ -108,20 +107,20 @@ The CHOLMOD solver (\code{cholmod = TRUE}) uses a direct Cholesky
 decomposition that can be much faster than the default algebraic multigrid
 solver for moderate problem sizes, but may consume large amounts of memory
 for very large problems. It cannot be used with single precision.
+
+Point locations are supplied as a \code{SpatVector} and written to a
+temporary Circuitscape point file internally.
 }
 \examples{
 \dontrun{
-library(terra)
-# Create a SpatVector of sample points
-coords <- matrix(runif(20, 0, 100), ncol = 2)
-pts    <- vect(coords, crs = "")
-gd     <- runif(choose(10, 2))
+pts <- terra::vect(sample_pops[[1]], type = "points")
 
 jl.inputs <- jl.prep(
-  n.Pops       = 10,
-  response     = gd,
+  n.Pops = nrow(sample_pops[[1]]),
+  response = lower(Dc_list[[1]]),
   CS_Point.File = pts,
-  JULIA_HOME   = "/usr/local/julia/bin"
+  JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
+  run_test = FALSE
 )
 }
 }
