@@ -1,0 +1,462 @@
+ResistanceGA 4.2-11
+--------
+* Removed dependency and support for `XRJulia`
+
+ResistanceGA 4.2-10
+--------
+* Fixed bug that always rescaled categorical variables to the maximum specified resistance value.
+
+ResistanceGA 4.2-9
+--------
+* Updated imports to accommodate new package requirements.
+
+ResistanceGA 4.2-8
+--------
+* Fixed bug causing Errors when optimizing multiple categorical surfaces.
+
+ResistanceGA 4.2-7
+--------
+* Fixed bug in `gdist.prep` that caused an error when not specifying a response variable.
+
+ResistanceGA 4.2-6
+--------
+* Updated GA.prep code to allow specification of how many unique values can be considered in a categorical surface
+
+ResistanceGA 4.2-5
+--------
+* Fixed bug that prevented `jl.prep` from being run when `response = NULL`
+
+ResistanceGA 4.2-4
+--------
+* Updated rescaling of categorical values to ensure maximum resistance <= specified maximum
+* Changed default maximum resistance of categorical and continuous surfaces to be 1,000
+
+ResistanceGA 4.2-3
+--------
+* Updated rescaling of categorical values to ensure maximum resistance <= specified maximum
+
+ResistanceGA 4.2-2
+--------
+* Updated files so vignettes can be built across platforms [16 December 2021]
+
+ResistanceGA 4.2-1
+--------
+* Added checks and warning messages to `GA.prep`, `gdist.prep`, and `jl.prep` [3 August 2021]
+* Updated README file [3 August 2020]
+
+ResistanceGA 4.2
+--------
+* Added a new 'Getting Started' vignette.
+* Updated code to create paths across platforms [2021 July 29]
+
+ResistanceGA 4.1-0.47
+--------
+* Updated `all_comb` function to correctly accomodate a specified number of layers without single surface optimization [2021 July 7]
+* Updated `GA.prep` function `percent.elite` to conform to new standards in the GA package [2021 July 27]
+
+ResistanceGA 4.1-0.46
+--------
+* A lot of clean up of code and updating NAMESPACE [2021 April 27]
+
+ResistanceGA 4.1-0.45
+--------
+* Fixed bug with using experimental single precision option when optimizing with CS Julia [2021 Jan 14]
+
+ResistanceGA 4.1-0.44
+--------
+* Fixed potential bug in Bootstrap function
+
+ResistanceGA 4.1-0.43
+--------
+* Corrected directory setting
+* Added Julia Vignette
+
+ResistanceGA 4.1-0.42
+--------
+* Updated internal raster assessment functions
+
+ResistanceGA 4.1-0.41
+--------
+* Updated default plotting option
+
+ResistanceGA 4.1-0.40
+--------
+* Ability to turn off diagnostic plotting in SS & MS optim functions (Default = TRUE)
+
+ResistanceGA 4.1-0.39
+--------
+* Fixed JuliaCall load error
+
+ResistanceGA 4.1-0.38
+--------
+* 30 April commit
+
+ResistanceGA 4.1-0.37
+--------
+* Minor code formatting and updates
+
+ResistanceGA 4.1-0.36
+--------
+* Updated function documentation
+
+ResistanceGA 4.1-0.35
+--------
+* Updated gaisl for use with all.comb function
+
+ResistanceGA 4.1-0.34
+--------
+* Updated pairs_to_include handling
+* Fixed bug with Run_gdistance
+
+ResistanceGA 4.1-0.33
+--------
+* Update to AICc calculation
+* Fixed bug in temporary file handling when using Julia
+
+ResistanceGA 4.1-0.32
+--------
+* Bug fixes and and adjustments to scratch directory use
+
+ResistanceGA 4.1-0.31
+--------
+* Updated scratch directory use
+
+ResistanceGA 4.1-0.30
+--------
+* Minor bug fixes
+
+ResistanceGA 4.1-0.29
+--------
+* Updates to accomodate running on linux cluster
+
+ResistanceGA 4.1-0.28
+--------
+* Added new sample data sets for running examples
+
+ResistanceGA 4.1-0.27
+--------
+* Updated Run_julia function to export cumulative .asc maps
+
+ResistanceGA 4.1-0.26
+--------
+* Minor bug fixes to Julia covariate function
+
+ResistanceGA 4.1-0.25
+--------
+* Covariates can now be used when optimizing with Julia
+
+ResistanceGA 4.1-0.24
+--------
+* Updated bootstrap function to accomodate select pairs
+
+ResistanceGA 4.1-0.23
+--------
+* Now possible to optimize using select pairs of individuals or populations when using Julia
+
+ResistanceGA 4.1-0.22
+--------
+* Updated multisurface optimization to accommodate covariates
+* Added catch to optimization functions constraining resistance distance to have a positive relationship with genetic distance
+
+ResistanceGA 4.1-0.21
+--------
+* Added function to calculate SHNe metrics (see Prunier et al. 2017, Method in Ecology and Evolution)
+* It is now possible to conduct single surface optimization with covariates in the MLPE model. This was specifically designed to incorporate SHNe metrics during optimization
+
+ResistanceGA 4.1-0.20
+--------
+* Updated all combinations function to pass the best single surface results to the multisurface optimization as starting values.
+
+ResistanceGA 4.1-0.19
+--------
+* Added ability to fit MLPE with the 'mlpe_rga' function using only select pairwise observations
+
+ResistanceGA 4.1-0.18
+--------
+* Debugging Julia interaction
+
+ResistanceGA 4.1-0.17
+--------
+* Updated XRJulia handling of results
+
+ResistanceGA 4.1-0.16
+--------
+* Updated how Julia interacts with system
+
+ResistanceGA 4.1-0.15
+--------
+* Added ability to use 'XRJulia' as an alternative to 'JuliaCall' when calling Circuitscape Julia.
+
+ResistanceGA 4.1-0.14
+--------
+* Have paritally integrated method to optimize on select pairs of samples (not yet functional)
+* Added a 'monitor' arguement to GA.prep
+
+ResistanceGA 4.1-0.13
+--------
+* Updated Bootstrap code
+
+ResistanceGA 4.1-0.12
+--------
+* Updated code allow ResistanceGA to be run in parallel when using CIRCUITSCAPE
+
+ResistanceGA 4.1-0.11
+--------
+* Updated and fixed bug in bootstrap function
+* Added to switch to run Julia silently
+* Updated GA dependency
+
+ResistanceGA 4.1-0.10
+--------
+* Multisurface k-value bug resolved 
+
+ResistanceGA 4.1-0.3 to 4.1-0.9
+--------
+* Numerous bug fixes and minor updates. Fixed error causing miscalculation of parameters when using multisurface approach.
+
+ResistanceGA 4.1-0.2
+--------
+* Extensive updates. Have now fully implemented the Islands optimization approach from the GA package (gaisl), as well as the hybrid local optimization features. Setting `gaisl = TRUE` has great potential to vastly speed up optimization.
+
+ResistanceGA 4.1-0.1
+--------
+* Continued debugging and upgrading of functions
+
+ResistanceGA 4.1-0
+--------
+* It is now possible to optimize with Circuitscape run through Julia. This requires that Julia is properly installed on your system. Potential benefits of this approach include (i) ability to run CS in parallel; (ii) ability to run genetic algorithm in parallel; (iii) ability to run both CS and genetic algorithm in parallel; (iv) Julia implementation of CS is slightly faster than original CS program. This has only been tested on a Windows machine to date. Features of the Julia implementation that are supposed to improve speed (e.g., cholmod solver, parallelization when solving large rasters does not seem to scale).
+
+ResistanceGA 4.0-6
+--------
+* Numerous code updates
+* Fixed bug in function used to determine k (number of parameters used for calculating AICc) in multi surface and all combinations analyses. Was previously underestimating the number of parameters when using the default settings. NOTE: This should not substantively change results using previous versions.
+* Have updated code to be more robust when restricting optimization to specific transformations.
+
+ResistanceGA 4.0-5
+--------
+* Updated function syntax for ga
+* Added pipe operator
+* Updated transformation selection function for multisurface optimization
+
+ResistanceGA 4.0-4
+--------
+* Fixed a bug that prevented optimization summary when using CIRCUITSCAPE
+
+ResistanceGA 4.0-3
+--------
+* Fixed a bug that caused multi-surface and all combinations analyses to crash
+
+ResistanceGA 4.0-2
+--------
+* Fixed a bug with `GA.prep` when running `all_comb`
+* Fixed typos in documentation
+
+ResistanceGA 4.0-1
+--------
+* Minor bug fixes and error message updates.
+* Updated the citation
+
+ResistanceGA 4.0-0
+--------
+* This is the official release of the development version that includes the `all_comb` function, as well as a generic `mlpe_rga` function for flexibly fitting MLPE mixed effects models.
+
+ResistanceGA 3.1-4
+--------
+* Updated Plot.trans function to generate marginal plots for response curve transformations. This uses the ggExtra package
+* Have implemented an `all_combs` function to facilitate the running of a full analysis from a single function: replicate runs of single and multisurface combinations, bootstrap resampling of results.
+* Gaussian smoothing now done with spatstat rather than smoothie package
+
+ResistanceGA 3.1-3
+--------
+* Default setting for k.value in GA.prep is now 2, meaning that AICc is calculated based on the number of parameters optimized, plus 1 for the mixed effects model intercept.
+* Typos corrected throughout documentation
+* Updated vignette
+
+ResistanceGA 3.1-2
+--------
+* Updated `Run_gdistance` function to apply geoCorrections specic to costDistance and commuteDistance
+
+ResistanceGA 3.1-1
+--------
+* Fixed bug in MS_optim.scale function
+* Added option to select which surfaces to apply kernel smoothing to when conducting multisurface optimization
+
+ResistanceGA 3.1-0
+--------
+* Full release of extensively updated package 
+* Added 'response' data for use with vignette
+
+ResistanceGA 3.0-5
+--------
+* Updated `Grid.Search` function 
+* Updated vignette
+* Correction of documentation typos
+* Added a percent contribution summary to the Combine_surfaces and MS_optim functions
+
+ResistanceGA 3.0-4
+--------
+* Default objective function for optimization has been set to log-likelihood (LL)
+* Surfaces can be optimized with `commuteDistance` from the `gdistance` package. This is nearly equivalent to CIRCUITSCAPE (except for different scaling of values), is faster, and allows optimization to be done in parallel.
+* It is possible to optimize a kernel smoothing scaling parameter (set `scale = TRUE` in the `GA.prep` function). This applies a Gaussian smoothing function from the `smoothie` package.
+* A new function was added to facilitate a bootstrap AIC analysis of optimized resistance surfaces. See the vignette for a worked example. (`Resist.boot`)
+
+ResistanceGA 3.0-3
+--------
+* Minor bug fixes
+
+ResistanceGA 3.0-2
+--------
+* Fix issue in SCALE returning infinite values (#3).
+
+ResistanceGA 3.0-1
+--------
+* The fitted, optimized MLPE mixed effects models are now saved with the output of the model runs.
+* It is now possible to run ResistanceGA with CIRCUITSCAPE on Linux (confirmed with Ubuntu)
+* Default method for optimization is now log likelihood (LL)
+
+ResistanceGA 3.0-0
+--------
+* Updates to the vignette
+* It is now possible to choose whether to optimize using AIC, R2, or log likelihood (LL) by specifying 'method' in `GA.prep`. The default is still AIC.
+* Is is now possible to specify how the number of parameters, k, is determined by setting `k.value` in `GA.prep`. The default is that k is equal to the number of parameters optimized, plus the the number of surfaces, plus the intercept.
+* The number of parameters, k, is now reported in the 'All_Results_Table.csv'
+* A number of smaller errors have been corrected
+* AICc is now calculated based upon the number of sampled populations in the analysis, rather than the number of pairwise comparisons between populations (as was the case in previous versions).
+* The syntax of the `CS.prep` and `gdist.prep` functions has been updated. Formerly `n.POPS` is now `n.Pops`
+
+ResistanceGA 2.2-3
+--------
+* Fixed bug in multisurface least cost path optimization
+
+
+ResistanceGA 2.2-2
+--------
+* Fixed bug in single surface least cost path optimization
+
+
+ResistanceGA 2.2-1
+--------
+* Fixed bug in multi-surface optimization function
+
+ResistanceGA 2.2-0
+--------
+* Updated default transformation plot output
+* Added pseudo R-squared measures to output tables of optimized surfaces
+* Updated function for specifying continuous surface transformations. It is no longer necessary to specify this if all transformations are to be assessed.
+
+ResistanceGA 2.1-0
+--------
+* Option to select specific transformations when optimizing
+
+ResistanceGA 2.0-18
+--------
+* Updated Grid.Search function to use 'Resistance.Opt_single' function
+
+ResistanceGA 2.0-17
+--------
+* Beta version with capability to run on Mac or Linux systems
+* Updated sections of vignette
+
+ResistanceGA 2.0-16
+--------
+* Optimization will proceed if NAs are generated by CIRCUITSCAPE; warning message generated.
+
+ResistanceGA 2.0-15
+--------
+* Optimized categorical raster is now correctly saved to results file
+
+ResistanceGA 2.0-14
+--------
+* Fixed error when running SS_optim with categorical surfaces
+
+ResistanceGA 2.0-13
+--------
+* More detail is now printed at each iteration, providing the transformation, shape, and max parameters, in addition to AICc.
+
+ResistanceGA 2.0-12
+--------
+* Fixed bug in 'Diagnostic.Plots' function.
+* Updated warning messages
+
+ResistanceGA 2.0-11
+--------
+* Fixed bug in 'Combine_Surfaces' function.
+
+ResistanceGA 2.0-10
+--------
+* Updated CS.prep error message
+
+ResistanceGA 2.0-9
+--------
+* Fixed error in Diagnostic.Plot
+* Cleaned and consolodated code for conducting raster transformations
+* Added functionality to use the advanced CIRCUITSCAPE feature of "pairs_to_include". This is not yet well documented, so contact me directly if you have interest in using this feature.
+
+ResistanceGA 2.0-8
+--------
+* Fixed critical error in transformation functions. Inverse and Reverse functions were being rotated in space.
+
+ResistanceGA 2.0-7
+--------
+* Fixed bug in `gdist_prep`
+* Added more error messages to functions
+
+ResistanceGA 2.0-6
+--------
+* Added more informative error messages to aid in troubleshooting and debugging
+
+ResistanceGA 2.0-5
+--------
+* Updated `gdist.prep` to accept .txt, a matrix object, or a SpatialPoints object for sample locations
+
+ResistanceGA 2.0-4
+---------
+* Fixed an error in Combine_Surfaces
+
+ResistanceGA 2.0-3
+---------
+* GA.prep can now handle RasterLayer and RasterStack objects for optimization using least cost paths
+* Added `rescale` feature to `Combine_Surfaces`. The default is TRUE, which will rescale the combined resistance surface so that the minimum resistance value is 1. This is accomplished by dividing by the minimum value in the resistance surface. This makes the comparison of optimized resistance surfaces easier since they often optimize to different solutions that are perfectly correlated in terms of relative resistance.
+* It is now possible to use a sample point grid (.asc file) to specify spatial sample locations when using `CS.prep`. This format is exported by the 'export to CIRCUITSCAPE' tool in ArcGIS
+* Fixed error in `Plot.trans` Reverse Monomolecular equation
+
+ResistanceGA 2.0-2
+---------
+* Have tested and added the option to run optimization in parallel when using least cost paths. Set `parallel= TRUE` or `parallel = #cores` in `GA.prep`
+* PARALLEL DOES NOT CURRENTLY WORK WHEN OPTIMIZING WITH CIRCUITSCAPE!!!
+
+ResistanceGA 2.0-1
+---------
+* Updated how categorical resistance values are reported
+* Updated examples in vignette to show how to optimize using cost distances and `gdistance`
+
+ResistanceGA 2.0-0
+---------
+* Added option to optimize using cost distance (least cost paths), implemented using `gdistance`
+ * `gdist.prep` and `Run_gdistance` functions
+* Fixed error in `Run_CS`
+
+ResistanceGA 1.0-3
+---------
+* Added data objects to run vignette
+* Updated vignette to use the provided data
+
+ResistanceGA 1.0-2
+---------
+* Fixed error in `MS_optim`
+* Made change to correctly report AICc value from `MS_optim` in summary output
+* Added figure to vignette
+* Modified package depends and imports
+
+ResistanceGA 1.0-1
+---------
+* Cleaned and consolidated code
+* Expanded vignette
+* Added option to `Run_CS` to return a `raster` object if `CurrentMap=TRUE`
+
+ResistanceGA 1.0-0
+---------
+* All functions are fully documented
+* Added `filled.contour` plot to `Grid.Search`
+* Added Distance and Null model output options to `SS_optim`
+* Vignette has been updated

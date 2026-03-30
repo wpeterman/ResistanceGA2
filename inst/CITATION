@@ -1,0 +1,27 @@
+bibentry(
+  bibtype  = "Article",
+  title    = "Ecological resistance surfaces predict fine-scale genetic differentiation in a terrestrial woodland salamander",
+  author   = c(
+    person("William E.", "Peterman"),
+    person("Grant M.", "Connette"),
+    person("Raymond D.", "Semlitsch"),
+    person("Lori S.", "Eggert")
+  ),
+  journal  = "Molecular Ecology",
+  year     = "2014",
+  volume   = "23",
+  number   = "10",
+  pages    = "2402--2413",
+  doi      = "10.1111/mec.12747"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "ResistanceGA: An R package for the optimization of resistance surfaces using genetic algorithms",
+  author   = person("William E.", "Peterman"),
+  journal  = "Methods in Ecology and Evolution",
+  year     = "2018",
+  volume   = "9",
+  pages    = "1638--1647",
+  doi      = "10.1111/2041-210X.12984"
+)

@@ -1,0 +1,36 @@
+Package: ResistanceGA2
+Title: Optimize Resistance Surfaces Using Genetic Algorithms
+Version: 1.0.0
+Authors@R: person(given = "Bill", family = "Peterman", role = c("aut", "cre"), email = "peterman.73@osu.edu")
+Description: Provides functions to optimize resistance surfaces using
+    Genetic Algorithms. Continuous and categorical surfaces can be
+    optimized, and multiple surfaces can be simultaneously optimized to
+    create novel resistance surfaces. Resistance distances can be
+    calculated via Circuitscape run in Julia or via the gdistance package.
+VignetteBuilder: knitr
+Depends:
+    R (>= 4.1),
+    terra (>= 1.7-0)
+Imports:
+    ggExtra,
+    ggplot2,
+    plyr,
+    dplyr,
+    gdistance (>= 1.6),
+    magrittr,
+    GA (>= 3.2.1),
+    lme4 (>= 1.0),
+    Matrix,
+    MuMIn,
+    spdep,
+    doParallel,
+    foreach,
+    JuliaConnectoR
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+License: GPL (>= 2)
+LazyData: true
+Encoding: UTF-8
+RoxygenNote: 7.3.3
