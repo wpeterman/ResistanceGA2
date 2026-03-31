@@ -169,7 +169,7 @@ Plot.trans <- function(PARM,
       p <- ggplot(plot.data, aes(x = original, y = transformed)) +
         # ggtitle(equation) +
         theme_bw() +
-        geom_line(size = 1.5) +
+        geom_line(linewidth = 1.5) +
         xlab(expression(bold(
           "Original data values"
         ))) +
@@ -321,7 +321,7 @@ Plot.trans <- function(PARM,
         breaks = y.break) +
       geom_line(data = plot.data[plot.data$type==2,],
                 aes(x = original, y = transformed),
-                size = 1.5,
+                linewidth = 1.5,
                 color = "black") +
       removeGrid()
     

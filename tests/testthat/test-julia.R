@@ -35,7 +35,7 @@ find_julia_bindir <- function() {
   normalizePath(dirname(candidates[[1]]), winslash = "/", mustWork = TRUE)
 }
 
-test_that("Run_CS.jl auto-creates EXPORT.dir and returns a current map", {
+skip_if_julia_unavailable <- function() {
   testthat::skip_if_not_installed("JuliaConnectoR")
 
   bindir <- find_julia_bindir()
@@ -48,10 +48,50 @@ test_that("Run_CS.jl auto-creates EXPORT.dir and returns a current map", {
   }, error = function(e) FALSE)
   testthat::skip_if_not(cs_ready, "Circuitscape.jl is not available in Julia.")
 
-  pts <- terra::vect(sample_pops[[1]][1:5, ], type = "points")
-  gd <- lower(Dc_list[[1]][1:5, 1:5])
+  bindir
+}
 
-  jl_inputs <- jl.prep(
+get_julia_pkg_data <- function(name) {
+  data_env <- new.env(parent = emptyenv())
+  utils::data(list = name, package = "ResistanceGA2", envir = data_env)
+  get(name, envir = data_env)
+}
+
+unwrap_julia_raster <- function(x) {
+  if (inherits(x, "PackedSpatRaster")) {
+    terra::unwrap(x)
+  } else {
+    x
+  }
+}
+
+make_julia_example <- function(n = 5) {
+  sample_pops <- get_julia_pkg_data("sample_pops")
+  dc_list <- get_julia_pkg_data("Dc_list")
+  pts <- terra::vect(sample_pops[[1]][seq_len(n), ], type = "points")
+  gd <- ResistanceGA2::lower(dc_list[[1]][seq_len(n), seq_len(n)])
+  keep <- rep(c(1L, 0L), length.out = length(gd))
+  covariates <- data.frame(elev = seq_along(gd) / 100)
+
+  list(
+    pts = pts,
+    gd = gd,
+    keep = keep,
+    covariates = covariates,
+    response_cov = gd + covariates$elev
+  )
+}
+
+test_that("Run_CS.jl auto-creates EXPORT.dir and returns a current map", {
+  bindir <- skip_if_julia_unavailable()
+  sample_pops <- get_julia_pkg_data("sample_pops")
+  dc_list <- get_julia_pkg_data("Dc_list")
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  pts <- terra::vect(sample_pops[[1]][1:5, ], type = "points")
+  gd <- ResistanceGA2::lower(dc_list[[1]][1:5, 1:5])
+
+  jl_inputs <- ResistanceGA2::jl.prep(
     n.Pops = 5,
     response = gd,
     CS_Point.File = pts,
@@ -64,7 +104,7 @@ test_that("Run_CS.jl auto-creates EXPORT.dir and returns a current map", {
   on.exit(unlink(export_dir, recursive = TRUE, force = TRUE), add = TRUE)
 
   out <- suppressMessages(
-    Run_CS.jl(
+    ResistanceGA2::Run_CS.jl(
       jl.inputs = jl_inputs,
       r = raster_orig[["cont_orig"]],
       CurrentMap = TRUE,
@@ -77,4 +117,149 @@ test_that("Run_CS.jl auto-creates EXPORT.dir and returns a current map", {
   expect_true(inherits(out, "SpatRaster"))
   expect_equal(terra::nlyr(out), 1L)
   expect_identical(names(out), "cont_orig")
+})
+
+test_that("jl.prep handles pairs_to_include, covariates, and write.files", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+
+  write_dir <- tempfile("rga2-jl-write-")
+  on.exit(unlink(write_dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  jl_inputs <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::jl.prep(
+        n.Pops = 5,
+        response = example$response_cov,
+        CS_Point.File = example$pts,
+        covariates = example$covariates,
+        formula = response ~ elev,
+        JULIA_HOME = bindir,
+        pairs_to_include = example$keep,
+        write.files = write_dir,
+        run_test = FALSE,
+        silent = TRUE
+      )
+    )
+  )
+
+  expect_true(dir.exists(write_dir))
+  expect_true(file.exists(jl_inputs$CS_Point.File))
+  expect_true(file.exists(jl_inputs$pairs_to_include))
+  expect_identical(jl_inputs$keep, example$keep)
+  expect_equal(nrow(jl_inputs$df), sum(example$keep))
+  expect_equal(nrow(jl_inputs$covariates), sum(example$keep))
+  expect_equal(ncol(jl_inputs$ZZ), sum(example$keep))
+  expect_true(all(c("gd", "elev", "pop") %in% names(jl_inputs$df)))
+  expect_match(paste(deparse(jl_inputs$formula), collapse = " "), "cd")
+})
+
+test_that("Run_CS.jl returns a full matrix with excluded pairs marked -1", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  jl_inputs <- suppressWarnings(
+    ResistanceGA2::jl.prep(
+      n.Pops = 5,
+      response = example$gd,
+      CS_Point.File = example$pts,
+      JULIA_HOME = bindir,
+      pairs_to_include = example$keep,
+      run_test = FALSE,
+      silent = TRUE
+    )
+  )
+
+  expect_warning(
+    out <- ResistanceGA2::Run_CS.jl(
+      jl.inputs = jl_inputs,
+      r = raster_orig[["cont_orig"]],
+      full.mat = TRUE
+    ),
+    "excluded pairs"
+  )
+
+  expect_equal(dim(out), c(5L, 5L))
+  expect_true(any(out == -1, na.rm = TRUE))
+  expect_true(all(diag(out) == 0))
+})
+
+test_that("SS_optim covers the Julia optimization branch", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  jl_inputs <- ResistanceGA2::jl.prep(
+    n.Pops = 5,
+    response = example$gd,
+    CS_Point.File = example$pts,
+    JULIA_HOME = bindir,
+    run_test = FALSE,
+    silent = TRUE
+  )
+  ga_inputs <- ResistanceGA2::GA.prep(
+    raster = raster_orig[["cont_orig"]],
+    Results.dir = tempfile(pattern = "ss-optim-jl-"),
+    pop.size = 10,
+    maxiter = 1,
+    run = 1,
+    seed = 1,
+    monitor = FALSE,
+    quiet = TRUE
+  )
+
+  ss_out <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::SS_optim(
+        jl.inputs = jl_inputs,
+        GA.inputs = ga_inputs,
+        dist_mod = FALSE,
+        null_mod = FALSE,
+        diagnostic_plots = FALSE
+      )
+    )
+  )
+
+  expect_s3_class(ss_out$AICc, "data.frame")
+  expect_true("cont_orig" %in% ss_out$AICc$Surface)
+})
+
+test_that("MS_optim covers the Julia multisurface branch", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  jl_inputs <- ResistanceGA2::jl.prep(
+    n.Pops = 5,
+    response = example$gd,
+    CS_Point.File = example$pts,
+    JULIA_HOME = bindir,
+    run_test = FALSE,
+    silent = TRUE
+  )
+  ga_inputs <- ResistanceGA2::GA.prep(
+    raster = raster_orig[[c("cat_orig", "cont_orig")]],
+    Results.dir = tempfile(pattern = "ms-optim-jl-"),
+    pop.size = 10,
+    maxiter = 1,
+    run = 1,
+    seed = 1,
+    monitor = FALSE,
+    quiet = TRUE
+  )
+
+  ms_out <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::MS_optim(
+        jl.inputs = jl_inputs,
+        GA.inputs = ga_inputs,
+        diagnostic_plots = FALSE
+      )
+    )
+  )
+
+  expect_s3_class(ms_out$AICc.tab, "data.frame")
+  expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
+  expect_true(nrow(ms_out$percent.contribution) >= 2L)
 })

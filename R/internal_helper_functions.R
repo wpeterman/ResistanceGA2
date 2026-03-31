@@ -41,7 +41,7 @@ expand.mat <- function(mat,
     
   } else {
     
-    if(is.vector(mat) | dim(mat)[2] == 1) {
+    if(is.vector(mat) || dim(mat)[2] == 1) {
       n.mat <- matrix(0, length(pop_n), length(pop_n))
       n.mat[lower.tri(n.mat)] <- mat
       mat <- n.mat

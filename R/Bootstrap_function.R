@@ -143,7 +143,10 @@ Resist.boot <-
         dplyr::mutate(., RMSE = RMSE)
       
       if(rank.method == 'LL') {
-        AICc.tab <- dplyr::mutate(AICc.tab, rank = dplyr::dense_rank(desc(LL)))
+        AICc.tab <- dplyr::mutate(
+          AICc.tab,
+          rank = dplyr::dense_rank(dplyr::desc(LL))
+        )
       } else if (rank.method == 'AIC') {
         AICc.tab <- dplyr::mutate(AICc.tab, rank = dplyr::dense_rank(AIC))
       } else if(rank.method == 'R2'){

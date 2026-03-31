@@ -1,11 +1,16 @@
-ResistanceGA2 1.1-0
+ResistanceGA2 1.1.1
+---------
+* Expanded unit tests
+* Improved error catching
+
+ResistanceGA2 1.1.0
 ---------
 * Working package with unit tests
 
-ResistanceGA2 1.0-1
+ResistanceGA2 1.0.1
 ---------
 * Vignette update
 
-ResistanceGA2 1.0-0
+ResistanceGA2 1.0.0
 ---------
 * Initial commit of the updated package
