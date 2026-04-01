@@ -309,7 +309,7 @@ the available curve families, not to imply that these are the parameter values
 that should be used in an analysis. The flat Distance transformation is not
 shown because it simply assigns a constant resistance of 1 everywhere.
 
-```{r transformation-families, fig.width=12, fig.height=7, fig.cap="Illustrative transformation families available for continuous resistance surfaces. All panels use the same shape and maximum parameters to emphasize differences in curve geometry."}
+```{r transformation-families, echo=FALSE, fig.width=7, fig.height=12, fig.cap="*Illustrative transformation families available for continuous resistance surfaces. All panels use the same shape and maximum parameters to emphasize differences in curve geometry.*"}
 scale_vector <- function(x, min_out, max_out) {
   ((x - min(x)) * (max_out - min_out) / (max(x) - min(x))) + min_out
 }
@@ -378,7 +378,7 @@ curve_data$transformation <- factor(curve_data$transformation, levels = curve_na
 
 ggplot2::ggplot(curve_data, ggplot2::aes(x = original, y = transformed)) +
   ggplot2::geom_line(linewidth = 0.9) +
-  ggplot2::facet_wrap(~ transformation, ncol = 4, scales = "free_y") +
+  ggplot2::facet_wrap(~ transformation, ncol = 2, scales = "free_y") +
   ggplot2::theme_bw() +
   ggplot2::labs(
     x = "Original data values",
@@ -406,6 +406,7 @@ Plot.trans(
   transformation = "Monomolecular",
   marginal.plot = FALSE
 )
+
 ```
 
 You can also apply a transformation directly to a raster:
