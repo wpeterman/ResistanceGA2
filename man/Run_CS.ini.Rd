@@ -9,6 +9,11 @@ Run_CS.ini(
   CS_Point.File = NULL,
   JULIA_HOME = NULL,
   EXPORT.dir = NULL,
+  mask_file = NULL,
+  source_file = NULL,
+  ground_file = NULL,
+  included_pairs_file = NULL,
+  reclass_file = NULL,
   cs_options = list(),
   return = c("all", "compute", "matrix", "current_map"),
   rm.files = FALSE,
@@ -34,6 +39,31 @@ a path to an existing Circuitscape point file. Required for raster
 
 \item{EXPORT.dir}{Directory where the temporary \code{.ini}, \code{.out},
 and any Circuitscape output rasters are written.}
+
+\item{mask_file}{Optional Circuitscape \code{mask_file}. May be a
+single-layer \code{SpatRaster} or an existing file path. When supplied,
+\code{use_mask} defaults to \code{TRUE} unless explicitly overridden.}
+
+\item{source_file}{Optional Circuitscape \code{source_file}. May be a
+single-layer \code{SpatRaster}, a point \code{SpatVector} with a value
+attribute, a numeric table in Circuitscape text-list format, or an
+existing file path.}
+
+\item{ground_file}{Optional Circuitscape \code{ground_file}. Same accepted
+forms as \code{source_file}. When using raster advanced mode and a raster
+is supplied, it is written as an ASCII grid.}
+
+\item{included_pairs_file}{Optional Circuitscape
+\code{included_pairs_file}. May be an existing file path, a 2-column table
+of node pairs (defaults to \code{include} mode), or a list with elements
+\code{mode = "include"/"exclude"} and \code{pairs = <2-column table>}.
+When supplied, \code{use_included_pairs} defaults to \code{TRUE} unless
+explicitly overridden.}
+
+\item{reclass_file}{Optional Circuitscape \code{reclass_file}. May be an
+existing file path or a numeric table, which is written to a temporary
+tab-delimited file as-is. When supplied, \code{use_reclass_table} defaults
+to \code{TRUE} unless explicitly overridden.}
 
 \item{cs_options}{Named list of Circuitscape \code{.ini} option overrides.
 Names should match Circuitscape keys exactly (for example,
@@ -86,6 +116,13 @@ Option names in \code{cs_options} and \code{...} should use the same keys
 that appear in a Circuitscape \code{.ini} file. The function currently
 exposes the full raster-mode option template written by the package for
 Circuitscape 4.0.5 and validates that overridden keys are known.
+
+The file-oriented arguments (\code{mask_file}, \code{source_file},
+\code{ground_file}, \code{included_pairs_file}, and \code{reclass_file})
+are convenience layers over the corresponding Circuitscape options. They are
+especially useful when working directly with terra objects or small R tables.
+For any more specialized file layout, users can still supply a file path
+directly through these arguments or through \code{cs_options}.
 }
 \examples{
 \dontrun{

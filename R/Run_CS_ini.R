@@ -301,6 +301,341 @@
   stop("`CS_Point.File` must be a terra::SpatVector of points, a path to an existing point file, or NULL.")
 }
 
+.cs_temp_input_file <- function(prefix, scratch = NULL, fileext = ".txt") {
+  normalizePath(
+    tempfile(pattern = prefix, tmpdir = .cs_temp_dir(scratch), fileext = fileext),
+    winslash = "/",
+    mustWork = FALSE
+  )
+}
+
+.cs_as_numeric_df <- function(x, arg) {
+  if (is.matrix(x)) {
+    x <- as.data.frame(x)
+  }
+
+  if (!is.data.frame(x)) {
+    stop("`", arg, "` must be a data.frame, matrix, terra object, or file path.")
+  }
+
+  is_num <- vapply(x, function(col) is.numeric(col) || is.integer(col), logical(1))
+  if (!all(is_num)) {
+    stop("`", arg, "` must contain only numeric columns when supplied as a table.")
+  }
+
+  as.data.frame(x)
+}
+
+.cs_guess_value_col <- function(df, arg) {
+  nm <- tolower(names(df))
+  for (candidate in c("value", "strength", "current", "resistance",
+                      "conductance", "ground", "source", "id")) {
+    idx <- which(nm == candidate)
+    if (length(idx) > 0L) {
+      return(idx[[1]])
+    }
+  }
+
+  numeric_cols <- which(vapply(df, is.numeric, logical(1)))
+  if (length(numeric_cols) == 1L) {
+    return(numeric_cols[[1]])
+  }
+
+  if (ncol(df) == 1L) {
+    return(1L)
+  }
+
+  stop(
+    "Could not determine which attribute column in `", arg,
+    "` should be used as the Circuitscape value field."
+  )
+}
+
+.cs_reorder_triples <- function(df, arg) {
+  df <- .cs_as_numeric_df(df, arg)
+  if (ncol(df) != 3L) {
+    stop(
+      "`", arg, "` must have exactly 3 columns in raster text-list form: value, x, y."
+    )
+  }
+
+  nm <- tolower(names(df))
+  value_idx <- match(TRUE, nm %in% c("value", "strength", "current",
+                                     "resistance", "conductance", "ground",
+                                     "source", "id"), nomatch = 0L)
+  x_idx <- match(TRUE, nm %in% c("x", "lon", "longitude", "easting"), nomatch = 0L)
+  y_idx <- match(TRUE, nm %in% c("y", "lat", "latitude", "northing"), nomatch = 0L)
+
+  if (value_idx > 0L && x_idx > 0L && y_idx > 0L) {
+    df <- df[, c(value_idx, x_idx, y_idx), drop = FALSE]
+  }
+
+  names(df) <- NULL
+  df
+}
+
+.cs_write_table_file <- function(x,
+                                 prefix,
+                                 scratch = NULL,
+                                 sep = "\t",
+                                 col.names = FALSE,
+                                 row.names = FALSE,
+                                 quote = FALSE) {
+  path <- .cs_temp_input_file(prefix, scratch = scratch, fileext = ".txt")
+  write.table(
+    x,
+    file = path,
+    sep = sep,
+    col.names = col.names,
+    row.names = row.names,
+    quote = quote
+  )
+
+  list(
+    path = normalizePath(path, winslash = "/", mustWork = TRUE),
+    temp_files = normalizePath(path, winslash = "/", mustWork = TRUE)
+  )
+}
+
+.cs_write_raster_option <- function(x, arg, scratch = NULL, prefix = "circuitscape_opt_") {
+  if (is.character(x) && length(x) == 1L) {
+    if (!file.exists(x)) {
+      stop("File supplied to `", arg, "` does not exist: ", x)
+    }
+
+    return(list(
+      path = normalizePath(x, winslash = "/", mustWork = TRUE),
+      temp_files = character()
+    ))
+  }
+
+  if (!inherits(x, "SpatRaster")) {
+    stop("`", arg, "` must be a terra::SpatRaster or an existing file path.")
+  }
+
+  R <- .validate_spatraster(x, arg = arg, nlyr = 1L)
+  path <- .cs_temp_input_file(prefix, scratch = scratch, fileext = ".asc")
+  terra::writeRaster(x = R, filename = path, overwrite = TRUE)
+
+  list(
+    path = normalizePath(path, winslash = "/", mustWork = TRUE),
+    temp_files = normalizePath(path, winslash = "/", mustWork = TRUE)
+  )
+}
+
+.cs_prepare_value_map_file <- function(x,
+                                       arg,
+                                       scratch = NULL,
+                                       prefix = "circuitscape_values_",
+                                       data_type = "raster") {
+  if (is.character(x) && length(x) == 1L) {
+    if (!file.exists(x)) {
+      stop("File supplied to `", arg, "` does not exist: ", x)
+    }
+
+    return(list(
+      path = normalizePath(x, winslash = "/", mustWork = TRUE),
+      temp_files = character()
+    ))
+  }
+
+  data_type <- tolower(data_type)
+
+  if (inherits(x, "SpatRaster")) {
+    if (!identical(data_type, "raster")) {
+      stop("`", arg, "` can only be supplied as a SpatRaster when `data_type = 'raster'`.")
+    }
+    return(.cs_write_raster_option(x, arg = arg, scratch = scratch, prefix = prefix))
+  }
+
+  if (inherits(x, "SpatVector")) {
+    if (!identical(data_type, "raster")) {
+      stop("`", arg, "` can only be supplied as a SpatVector when `data_type = 'raster'`.")
+    }
+
+    pts <- .validate_spatvector_points(x, arg = arg)
+    attrs <- terra::values(pts)
+    if (is.null(attrs) || ncol(attrs) == 0L) {
+      stop("`", arg, "` SpatVector inputs must have at least one attribute column containing values.")
+    }
+    value_idx <- .cs_guess_value_col(attrs, arg)
+    coords <- .point_coords(pts, arg = arg)
+    table_out <- data.frame(
+      value = attrs[[value_idx]],
+      x = coords[, 1],
+      y = coords[, 2]
+    )
+
+    return(.cs_write_table_file(
+      table_out,
+      prefix = prefix,
+      scratch = scratch,
+      sep = "\t",
+      col.names = FALSE,
+      row.names = FALSE,
+      quote = FALSE
+    ))
+  }
+
+  df <- .cs_as_numeric_df(x, arg)
+  if (identical(data_type, "network")) {
+    if (ncol(df) != 2L) {
+      stop("`", arg, "` must have exactly 2 columns for Circuitscape network inputs: node_id, value.")
+    }
+    names(df) <- NULL
+  } else {
+    df <- .cs_reorder_triples(df, arg)
+  }
+
+  .cs_write_table_file(
+    df,
+    prefix = prefix,
+    scratch = scratch,
+    sep = "\t",
+    col.names = FALSE,
+    row.names = FALSE,
+    quote = FALSE
+  )
+}
+
+.cs_prepare_reclass_file <- function(x,
+                                     arg = "reclass_file",
+                                     scratch = NULL,
+                                     prefix = "circuitscape_reclass_") {
+  if (is.character(x) && length(x) == 1L) {
+    if (!file.exists(x)) {
+      stop("File supplied to `", arg, "` does not exist: ", x)
+    }
+
+    return(list(
+      path = normalizePath(x, winslash = "/", mustWork = TRUE),
+      temp_files = character()
+    ))
+  }
+
+  df <- .cs_as_numeric_df(x, arg)
+  if (ncol(df) < 2L) {
+    stop("`", arg, "` must have at least 2 columns when supplied as a table.")
+  }
+  names(df) <- NULL
+
+  .cs_write_table_file(
+    df,
+    prefix = prefix,
+    scratch = scratch,
+    sep = "\t",
+    col.names = FALSE,
+    row.names = FALSE,
+    quote = FALSE
+  )
+}
+
+.cs_prepare_included_pairs_file <- function(x,
+                                            arg = "included_pairs_file",
+                                            scratch = NULL,
+                                            prefix = "circuitscape_pairs_") {
+  if (is.character(x) && length(x) == 1L) {
+    if (!file.exists(x)) {
+      stop("File supplied to `", arg, "` does not exist: ", x)
+    }
+
+    return(list(
+      path = normalizePath(x, winslash = "/", mustWork = TRUE),
+      temp_files = character()
+    ))
+  }
+
+  mode <- "include"
+  pairs <- x
+
+  if (is.list(x) && !is.data.frame(x) && !is.matrix(x)) {
+    if (!all(c("mode", "pairs") %in% names(x))) {
+      stop(
+        "`", arg, "` lists must contain elements named `mode` and `pairs`."
+      )
+    }
+    mode <- match.arg(tolower(as.character(x$mode)), c("include", "exclude"))
+    pairs <- x$pairs
+  } else if (is.data.frame(x) && ncol(x) == 2L) {
+    nm <- tolower(names(x))
+    if (identical(nm[[1]], "mode") && nm[[2]] %in% c("include", "exclude")) {
+      mode <- nm[[2]]
+    }
+  }
+
+  df <- .cs_as_numeric_df(pairs, arg)
+  if (ncol(df) != 2L) {
+    stop(
+      "`", arg, "` must be a 2-column table of node pairs, a list with `mode` and `pairs`, or an existing file path."
+    )
+  }
+
+  path <- .cs_temp_input_file(prefix, scratch = scratch, fileext = ".txt")
+  con <- file(path, open = "wt")
+  on.exit(close(con), add = TRUE)
+  writeLines(paste("mode", mode), con = con)
+  write.table(df, file = con, sep = "\t", col.names = FALSE, row.names = FALSE, quote = FALSE)
+
+  list(
+    path = normalizePath(path, winslash = "/", mustWork = TRUE),
+    temp_files = normalizePath(path, winslash = "/", mustWork = TRUE)
+  )
+}
+
+.cs_materialize_file_options <- function(config, scratch = NULL) {
+  temp_files <- character()
+  data_type <- tolower(as.character(config[["Circuitscape mode"]][["data_type"]]))
+
+  value <- config[["Mask file"]][["mask_file"]]
+  if (!is.null(value) && !.cs_placeholder_value(value) && !identical(value, "None")) {
+    prep <- .cs_write_raster_option(value, arg = "mask_file", scratch = scratch, prefix = "circuitscape_mask_")
+    config[["Mask file"]][["mask_file"]] <- prep$path
+    temp_files <- c(temp_files, prep$temp_files)
+  }
+
+  value <- config[["Options for advanced mode"]][["source_file"]]
+  if (!is.null(value) && !.cs_placeholder_value(value) && !identical(value, "None")) {
+    prep <- .cs_prepare_value_map_file(
+      value,
+      arg = "source_file",
+      scratch = scratch,
+      prefix = "circuitscape_source_",
+      data_type = data_type
+    )
+    config[["Options for advanced mode"]][["source_file"]] <- prep$path
+    temp_files <- c(temp_files, prep$temp_files)
+  }
+
+  value <- config[["Options for advanced mode"]][["ground_file"]]
+  if (!is.null(value) && !.cs_placeholder_value(value) && !identical(value, "None")) {
+    prep <- .cs_prepare_value_map_file(
+      value,
+      arg = "ground_file",
+      scratch = scratch,
+      prefix = "circuitscape_ground_",
+      data_type = data_type
+    )
+    config[["Options for advanced mode"]][["ground_file"]] <- prep$path
+    temp_files <- c(temp_files, prep$temp_files)
+  }
+
+  value <- config[["Options for pairwise and one-to-all and all-to-one modes"]][["included_pairs_file"]]
+  if (!is.null(value) && !.cs_placeholder_value(value) && !identical(value, "None")) {
+    prep <- .cs_prepare_included_pairs_file(value, scratch = scratch)
+    config[["Options for pairwise and one-to-all and all-to-one modes"]][["included_pairs_file"]] <- prep$path
+    temp_files <- c(temp_files, prep$temp_files)
+  }
+
+  value <- config[["Options for reclassification of habitat data"]][["reclass_file"]]
+  if (!is.null(value) && !.cs_placeholder_value(value) && !identical(value, "None")) {
+    prep <- .cs_prepare_reclass_file(value, scratch = scratch)
+    config[["Options for reclassification of habitat data"]][["reclass_file"]] <- prep$path
+    temp_files <- c(temp_files, prep$temp_files)
+  }
+
+  list(config = config, temp_files = unique(temp_files))
+}
+
 .cs_output_base <- function(output_file) {
   output_file <- normalizePath(output_file, winslash = "/", mustWork = FALSE)
   sub("\\.out$", "", output_file)
@@ -434,6 +769,26 @@
 #'   \code{JuliaConnectoR} uses the current Julia configuration / environment.
 #' @param EXPORT.dir Directory where the temporary \code{.ini}, \code{.out},
 #'   and any Circuitscape output rasters are written.
+#' @param mask_file Optional Circuitscape \code{mask_file}. May be a
+#'   single-layer \code{SpatRaster} or an existing file path. When supplied,
+#'   \code{use_mask} defaults to \code{TRUE} unless explicitly overridden.
+#' @param source_file Optional Circuitscape \code{source_file}. May be a
+#'   single-layer \code{SpatRaster}, a point \code{SpatVector} with a value
+#'   attribute, a numeric table in Circuitscape text-list format, or an
+#'   existing file path.
+#' @param ground_file Optional Circuitscape \code{ground_file}. Same accepted
+#'   forms as \code{source_file}. When using raster advanced mode and a raster
+#'   is supplied, it is written as an ASCII grid.
+#' @param included_pairs_file Optional Circuitscape
+#'   \code{included_pairs_file}. May be an existing file path, a 2-column table
+#'   of node pairs (defaults to \code{include} mode), or a list with elements
+#'   \code{mode = "include"/"exclude"} and \code{pairs = <2-column table>}.
+#'   When supplied, \code{use_included_pairs} defaults to \code{TRUE} unless
+#'   explicitly overridden.
+#' @param reclass_file Optional Circuitscape \code{reclass_file}. May be an
+#'   existing file path or a numeric table, which is written to a temporary
+#'   tab-delimited file as-is. When supplied, \code{use_reclass_table} defaults
+#'   to \code{TRUE} unless explicitly overridden.
 #' @param cs_options Named list of Circuitscape \code{.ini} option overrides.
 #'   Names should match Circuitscape keys exactly (for example,
 #'   \code{scenario}, \code{write_cur_maps}, \code{use_mask},
@@ -473,6 +828,13 @@
 #' exposes the full raster-mode option template written by the package for
 #' Circuitscape 4.0.5 and validates that overridden keys are known.
 #'
+#' The file-oriented arguments (\code{mask_file}, \code{source_file},
+#' \code{ground_file}, \code{included_pairs_file}, and \code{reclass_file})
+#' are convenience layers over the corresponding Circuitscape options. They are
+#' especially useful when working directly with terra objects or small R tables.
+#' For any more specialized file layout, users can still supply a file path
+#' directly through these arguments or through \code{cs_options}.
+#'
 #' @export
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
@@ -495,6 +857,11 @@ Run_CS.ini <- function(r = NULL,
                        CS_Point.File = NULL,
                        JULIA_HOME = NULL,
                        EXPORT.dir = NULL,
+                       mask_file = NULL,
+                       source_file = NULL,
+                       ground_file = NULL,
+                       included_pairs_file = NULL,
+                       reclass_file = NULL,
                        cs_options = list(),
                        return = c("all", "compute", "matrix", "current_map"),
                        rm.files = FALSE,
@@ -555,6 +922,29 @@ Run_CS.ini <- function(r = NULL,
     list(...))
   overrides <- overrides[!vapply(overrides, is.null, logical(1))]
   config <- .cs_apply_overrides(config, overrides)
+
+  if (!is.null(mask_file)) {
+    config[["Mask file"]][["mask_file"]] <- mask_file
+    config[["Mask file"]][["use_mask"]] <- TRUE
+  }
+  if (!is.null(source_file)) {
+    config[["Options for advanced mode"]][["source_file"]] <- source_file
+  }
+  if (!is.null(ground_file)) {
+    config[["Options for advanced mode"]][["ground_file"]] <- ground_file
+  }
+  if (!is.null(included_pairs_file)) {
+    config[["Options for pairwise and one-to-all and all-to-one modes"]][["included_pairs_file"]] <- included_pairs_file
+    config[["Options for pairwise and one-to-all and all-to-one modes"]][["use_included_pairs"]] <- TRUE
+  }
+  if (!is.null(reclass_file)) {
+    config[["Options for reclassification of habitat data"]][["reclass_file"]] <- reclass_file
+    config[["Options for reclassification of habitat data"]][["use_reclass_table"]] <- TRUE
+  }
+
+  materialized <- .cs_materialize_file_options(config, scratch = scratch)
+  config <- materialized$config
+
   .cs_validate_required_options(config)
   .cs_validate_file_options(config)
 
@@ -589,7 +979,7 @@ Run_CS.ini <- function(r = NULL,
   pairwise_matrix <- .cs_extract_pairwise_matrix(raw_result, n_points = point_count)
   current_map <- .cs_load_current_map(output_base)
   generated_files <- .cs_existing_output_files(output_base)
-  temp_files <- unique(c(habitat$temp_files, points$temp_files, ini_file))
+  temp_files <- unique(c(habitat$temp_files, points$temp_files, materialized$temp_files, ini_file))
 
   result <- switch(
     return,
