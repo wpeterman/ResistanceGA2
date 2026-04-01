@@ -185,6 +185,47 @@ test_that("Run_CS.jl returns a full matrix with excluded pairs marked -1", {
   expect_true(all(diag(out) == 0))
 })
 
+test_that("Run_CS.ini writes INI overrides and returns full output", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  export_dir <- tempfile("rga2-jl-ini-")
+  on.exit(unlink(export_dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  out <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::Run_CS.ini(
+        r = raster_orig[["cont_orig"]],
+        CS_Point.File = example$pts,
+        JULIA_HOME = bindir,
+        EXPORT.dir = export_dir,
+        return = "all",
+        quiet = TRUE,
+        connect_four_neighbors_only = TRUE,
+        write_cur_maps = TRUE,
+        write_cum_cur_map_only = TRUE,
+        log_level = "critical",
+        screenprint_log = FALSE,
+        rm.files = FALSE
+      )
+    )
+  )
+
+  expect_true(file.exists(out$ini_file))
+  expect_false(is.null(out$result))
+  expect_true(is.matrix(out$pairwise_matrix))
+  expect_equal(dim(out$pairwise_matrix), c(5L, 5L))
+  expect_true(inherits(out$current_map, "SpatRaster"))
+
+  ini_lines <- readLines(out$ini_file, warn = FALSE)
+  ini_text <- paste(ini_lines, collapse = "\n")
+  expect_match(ini_text, "scenario = pairwise", fixed = TRUE)
+  expect_match(ini_text, "connect_four_neighbors_only = True", fixed = TRUE)
+  expect_match(ini_text, "write_cur_maps = True", fixed = TRUE)
+  expect_match(ini_text, "write_cum_cur_map_only = True", fixed = TRUE)
+})
+
 test_that("SS_optim covers the Julia optimization branch", {
   bindir <- skip_if_julia_unavailable()
   example <- make_julia_example()
