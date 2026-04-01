@@ -1,0 +1,42 @@
+% Generated manually for site-level pairwise environmental helpers
+\name{site_pairwise_diff}
+\alias{site_pairwise_diff}
+\title{Build Pairwise Environmental-Difference Covariates}
+\usage{
+site_pairwise_diff(data, vars = NULL, scale = FALSE,
+  transform = c("absolute", "squared"), keep = NULL, pop_n = NULL,
+  suffix = NULL)
+}
+\arguments{
+\item{data}{Numeric vector, matrix, or data frame of site-level environmental variables.}
+
+\item{vars}{Optional character or integer index selecting columns from \code{data}.}
+
+\item{scale}{Logical. If \code{TRUE}, standardize each site-level variable before computing pairwise differences. Constant variables are converted to zeros.}
+
+\item{transform}{Transformation applied to pairwise differences: \code{"absolute"} (default) or \code{"squared"}.}
+
+\item{keep}{Optional logical/integer vector used to retain a subset of the final pairwise observations.}
+
+\item{pop_n}{Optional integer vector giving the number of sampled individuals per population. When supplied, population-level environmental differences are expanded to the individual-level pair structure used by \code{\link[ResistanceGA2]{jl.prep}} with \code{pop2ind}.}
+
+\item{suffix}{Optional suffix appended to output column names. Defaults to \code{"_diff"} for absolute differences and \code{"_sqdiff"} for squared differences.}
+}
+\value{
+A data frame of pairwise environmental-difference covariates.
+}
+\description{
+Convert site-level environmental variables into pairwise covariates that are aligned with the lower-triangle ordering used throughout \pkg{ResistanceGA2}.
+}
+\details{
+These helpers are intended for isolation-by-environment workflows, where environmental mismatch between sample locations is used as one or more fixed effects in an MLPE model. The output can be supplied directly to the \code{covariates} argument of \code{\link[ResistanceGA2]{gdist.prep}} or \code{\link[ResistanceGA2]{jl.prep}}.
+}
+\examples{
+env <- data.frame(
+  temp = c(10, 12, 15, 11),
+  precip = c(100, 120, 80, 110)
+)
+
+site_pairwise_diff(env)
+site_pairwise_diff(env, vars = "temp", scale = TRUE)
+}
