@@ -170,6 +170,25 @@ test_that("Plot.trans returns plot objects and can write TIFF output", {
   expect_true(file.exists(file.path(out_dir, "Ricker_Transformation_plot-test.tif")))
 })
 
+test_that("Plot.trans does not explicitly print plots without a file device", {
+  p <- ResistanceGA2::Plot.trans(
+    PARM = c(2.5, 100),
+    Resistance = c(0, 1),
+    transformation = "Monomolecular",
+    marginal.plot = FALSE
+  )
+
+  expect_s3_class(p, "ggplot")
+  expect_equal(
+    sum(grepl(
+      "^[[:space:]]*print\\(p\\)$",
+      trimws(deparse(body(ResistanceGA2::Plot.trans))),
+      perl = TRUE
+    )),
+    1L
+  )
+})
+
 test_that("Plot.trans validates Resistance input", {
   expect_error(
     ResistanceGA2::Plot.trans(

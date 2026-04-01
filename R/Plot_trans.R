@@ -347,7 +347,6 @@ Plot.trans <- function(PARM,
     dev.off()
     return(p)
   }
-  print(p)
   return(p)
   
 }
