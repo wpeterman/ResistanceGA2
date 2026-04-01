@@ -9,7 +9,9 @@
 #' @param dist_mod Logical, if TRUE, a Distance model will be calculated and added to the output table (default = TRUE)
 #' @param null_mod Logical, if TRUE, an intercept-only model will be calculated and added to the output table (default = TRUE)
 #' @param diagnostic_plots Plotting and saving of diagnostic plots (Default = TRUE)
-#' @return This function optimizes resistance surfaces in isolation. Following optimization of all surfaces, several summary objects are created.\cr
+#' @return An object of class \code{resga_ss_optim}. This function optimizes
+#' resistance surfaces in isolation. Following optimization of all surfaces,
+#' several summary objects are created.\cr
 #' \enumerate{
 #' \item Diagnostic plots of model fit are output to the \code{Results/Plots}
 #' directory created beneath \code{Results.dir}.
@@ -4341,5 +4343,6 @@ SS_optim <- function(gdist.inputs = NULL,
   # rm(single.GA, r)
   setwd(wd)
   gc()
+  RESULTS <- resga_add_class(RESULTS, "resga_ss_optim")
   return(RESULTS)
 }

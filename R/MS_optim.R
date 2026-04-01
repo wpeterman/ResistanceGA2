@@ -6,8 +6,9 @@
 #' @param jl.inputs Object from \code{\link{jl.prep}}. Supply when optimizing with Circuitscape via Julia.
 #' @param GA.inputs Object from \code{\link{GA.prep}}.
 #' @param diagnostic_plots Logical. Generate and save diagnostic plots? Default = \code{TRUE}.
-#' @return A named list with GA summary, MLPE model, AICc table, distance matrices,
-#'   percent contribution, and \code{k} table.
+#' @return An object of class \code{resga_ms_optim}: a named list with GA
+#'   summary, MLPE model, AICc table, distance matrices, percent contribution,
+#'   and \code{k} table.
 #' @usage MS_optim(gdist.inputs = NULL, jl.inputs = NULL, GA.inputs, diagnostic_plots = TRUE)
 
 #' @export
@@ -395,6 +396,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   }
   
@@ -782,6 +784,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   } # End Julia
 } # End function

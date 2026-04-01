@@ -27,7 +27,11 @@
 #' @param null_mod Logical, if TRUE, an intercept-only model will be calculated and added to the output table (Default = TRUE)
 #' @param ... Additional arguments (Not currently used)
 
-#' @return This function optimizes resistance surfaces in isolation using \code{\link[ResistanceGA2]{SS_optim}}, followed by multisurface optimization using \code{\link[ResistanceGA2]{MS_optim}}, and then conducts a bootstrap analysis.
+#' @return An object of class \code{resga_all_comb}. This function optimizes
+#'   resistance surfaces in isolation using
+#'   \code{\link[ResistanceGA2]{SS_optim}}, followed by multisurface
+#'   optimization using \code{\link[ResistanceGA2]{MS_optim}}, and then
+#'   conducts a bootstrap analysis.
 #' @usage all_comb(gdist.inputs = NULL,
 #'                 jl.inputs = NULL,
 #'                 GA.inputs,
@@ -529,6 +533,7 @@ all_comb <- function(gdist.inputs = NULL,
     
   } # Close replicate loop
   
+  Results <- resga_add_class(Results, "resga_all_comb")
   return(Results)
   
 } # End function

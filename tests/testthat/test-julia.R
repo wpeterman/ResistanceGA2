@@ -221,6 +221,7 @@ test_that("SS_optim covers the Julia optimization branch", {
     )
   )
 
+  expect_s3_class(ss_out, "resga_ss_optim")
   expect_s3_class(ss_out$AICc, "data.frame")
   expect_true("cont_orig" %in% ss_out$AICc$Surface)
 })
@@ -259,6 +260,7 @@ test_that("MS_optim covers the Julia multisurface branch", {
     )
   )
 
+  expect_s3_class(ms_out, "resga_ms_optim")
   expect_s3_class(ms_out$AICc.tab, "data.frame")
   expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
   expect_true(nrow(ms_out$percent.contribution) >= 2L)

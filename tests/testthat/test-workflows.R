@@ -18,6 +18,13 @@ make_temp_dir <- function(prefix = "ResistanceGA2-test-") {
   paste0(normalizePath(path, winslash = "/"), "/")
 }
 
+with_test_plot <- function(code) {
+  plot_file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(plot_file)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  force(code)
+}
+
 make_pairwise_example <- function(n = 5, seed = 1) {
   set.seed(seed)
   coords <- matrix(runif(n * 2), ncol = 2)
@@ -261,9 +268,15 @@ test_that("Resist.boot ranks simple candidate distance matrices", {
     genetic.mat = example$genetic_mat
   )
 
-  expect_s3_class(boot_out, "data.frame")
+  expect_s3_class(boot_out, c("resga_bootstrap", "data.frame"))
   expect_equal(nrow(boot_out), 2L)
   expect_true(all(c("surface", "avg.rank", "Percent.top", "k") %in% names(boot_out)))
+
+  boot_summary <- summary(boot_out)
+  expect_s3_class(boot_summary, "summary.resga_bootstrap")
+  expect_identical(boot_summary$best_surface, "model_1")
+
+  expect_no_error(with_test_plot(plot(boot_out)))
 })
 
 test_that("SS_optim completes a minimal gdistance workflow", {
@@ -286,9 +299,16 @@ test_that("SS_optim completes a minimal gdistance workflow", {
     c("ContinuousResults", "CategoricalResults", "AICc", "MLPE",
       "Run.Time", "MLPE.list", "cd", "k", "ga")
   )
+  expect_s3_class(ss_out, "resga_ss_optim")
   expect_s3_class(ss_out$AICc, "data.frame")
   expect_length(ss_out$ga, 1L)
   expect_true("continuous" %in% names(ss_out$cd))
+
+  ss_summary <- summary(ss_out)
+  expect_s3_class(ss_summary, "summary.resga_ss_optim")
+  expect_identical(ss_summary$best_surface, "continuous")
+
+  expect_no_error(with_test_plot(plot(ss_out)))
 })
 
 test_that("MS_optim completes a minimal multisurface workflow", {
@@ -309,9 +329,16 @@ test_that("MS_optim completes a minimal multisurface workflow", {
     c("GA.summary", "MLPE.model", "MLPE.model_REML", "AICc.tab",
       "cd", "percent.contribution", "k")
   )
+  expect_s3_class(ms_out, "resga_ms_optim")
   expect_s4_class(ms_out$GA.summary, "ga")
   expect_s3_class(ms_out$AICc.tab, "data.frame")
   expect_s3_class(ms_out$percent.contribution, "data.frame")
+
+  ms_summary <- summary(ms_out)
+  expect_s3_class(ms_summary, "summary.resga_ms_optim")
+  expect_false(is.na(ms_summary$best_surface))
+
+  expect_no_error(with_test_plot(plot(ms_out)))
 })
 
 test_that("SS_optim covers covariate, distance, and null-model branches", {
