@@ -125,6 +125,22 @@ resga_all_comb_runs <- function(x) {
 #' @param type Plot type for multisurface optimization results.
 #' @param main Optional plot title.
 #' @param ... Additional arguments passed to plotting methods.
+#' @rawNamespace S3method(plot,resga_all_comb)
+#' @rawNamespace S3method(plot,resga_bootstrap)
+#' @rawNamespace S3method(plot,resga_ms_optim)
+#' @rawNamespace S3method(plot,resga_ss_optim)
+#' @rawNamespace S3method(print,resga_all_comb)
+#' @rawNamespace S3method(print,resga_bootstrap)
+#' @rawNamespace S3method(print,resga_ms_optim)
+#' @rawNamespace S3method(print,resga_ss_optim)
+#' @rawNamespace S3method(print,summary.resga_all_comb)
+#' @rawNamespace S3method(print,summary.resga_bootstrap)
+#' @rawNamespace S3method(print,summary.resga_ms_optim)
+#' @rawNamespace S3method(print,summary.resga_ss_optim)
+#' @rawNamespace S3method(summary,resga_all_comb)
+#' @rawNamespace S3method(summary,resga_bootstrap)
+#' @rawNamespace S3method(summary,resga_ms_optim)
+#' @rawNamespace S3method(summary,resga_ss_optim)
 #'
 #' @name ResistanceGA2-result-methods
 NULL

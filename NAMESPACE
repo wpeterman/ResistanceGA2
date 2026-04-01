@@ -16,6 +16,7 @@ S3method(summary,resga_all_comb)
 S3method(summary,resga_bootstrap)
 S3method(summary,resga_ms_optim)
 S3method(summary,resga_ss_optim)
+
 export("%>%")
 export(Combine_Surfaces)
 export(Diagnostic.Plots)
