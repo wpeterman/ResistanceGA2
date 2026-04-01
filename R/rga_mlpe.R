@@ -63,7 +63,12 @@ mlpe_rga <-
            ZZ = NULL,
            keep = NULL,
            ...) {
-    if (is.null(ZZ)) {
+    pair_terms <- attr(data, "mlpe_pairs", exact = TRUE)
+    if (!is.list(pair_terms) || length(pair_terms) == 0L) {
+      pair_terms <- NULL
+    }
+
+    if (is.null(pair_terms) && is.null(ZZ)) {
       obs <- 0.5 * (sqrt((8 * nrow(data)) + 1) + 1)
       ID <- To.From.ID(obs)
       ZZ <- ZZ.mat(ID)
@@ -72,7 +77,8 @@ mlpe_rga <-
     .mlpe_fit_mermod(formula = formula,
                      data = data,
                      REML = REML,
-                     ZZ = ZZ,
+                     pairs = pair_terms,
+                     ZZ = if (is.null(pair_terms)) ZZ else NULL,
                      keep = keep,
                      ...)
   }

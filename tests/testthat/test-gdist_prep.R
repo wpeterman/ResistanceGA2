@@ -56,6 +56,41 @@ test_that("gdist.prep df has gd and pop columns when response supplied", {
   expect_equal(nrow(out$df), choose(8, 2))
 })
 
+test_that("gdist.prep attaches MLPE dyad metadata that matches legacy ZZ fitting", {
+  coords <- make_points(6)
+  gd <- make_gd(6)
+  out <- gdist.prep(n.Pops = 6, response = gd, samples = coords, method = "costDistance")
+
+  expect_named(attr(out$df, "mlpe_pairs"), "pop")
+
+  dat_attr <- out$df
+  dat_attr$cd <- scale(seq_len(nrow(dat_attr)))
+
+  fit_attr <- ResistanceGA2::mlpe_rga(
+    formula = out$formula,
+    data = dat_attr,
+    ZZ = out$ZZ,
+    REML = FALSE
+  )
+
+  dat_legacy <- dat_attr
+  attr(dat_legacy, "mlpe_pairs") <- NULL
+
+  fit_legacy <- ResistanceGA2::mlpe_rga(
+    formula = out$formula,
+    data = dat_legacy,
+    ZZ = out$ZZ,
+    REML = FALSE
+  )
+
+  expect_equal(as.numeric(logLik(fit_attr)),
+               as.numeric(logLik(fit_legacy)),
+               tolerance = 1e-8)
+  expect_equal(unname(lme4::fixef(fit_attr)),
+               unname(lme4::fixef(fit_legacy)),
+               tolerance = 1e-8)
+})
+
 test_that("gdist.prep df is NULL when no response supplied", {
   coords <- make_points(8)
   out    <- gdist.prep(n.Pops = 8, samples = coords)

@@ -151,6 +151,7 @@ test_that("jl.prep handles pairs_to_include, covariates, and write.files", {
   expect_equal(nrow(jl_inputs$covariates), sum(example$keep))
   expect_equal(ncol(jl_inputs$ZZ), sum(example$keep))
   expect_true(all(c("gd", "elev", "pop") %in% names(jl_inputs$df)))
+  expect_named(attr(jl_inputs$df, "mlpe_pairs"), "pop")
   expect_match(paste(deparse(jl_inputs$formula), collapse = " "), "cd")
 })
 

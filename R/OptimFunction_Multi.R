@@ -46,7 +46,7 @@ Resistance.Opt_multi <- function(PARM,
         dat    <- gdist.inputs$df
         dat$cd <- scale(c(cd))
 
-        fit.mod <- mlpe_rga(formula = gd ~ cd + (1 | pop),
+        fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                             data    = dat,
                             ZZ      = gdist.inputs$ZZ,
                             REML    = FALSE)
@@ -83,7 +83,7 @@ Resistance.Opt_multi <- function(PARM,
           dat$cd <- scale(lower(cd))
         }
 
-        fit.mod <- mlpe_rga(formula = gd ~ cd + (1 | pop),
+        fit.mod <- mlpe_rga(formula = jl.inputs$formula,
                             data    = dat,
                             ZZ      = jl.inputs$ZZ,
                             REML    = FALSE)

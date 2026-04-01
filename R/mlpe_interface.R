@@ -147,6 +147,88 @@ mlpe <- function(formula,
 }
 
 
+.mlpe_attach_workflow_pairs <- function(data, ID) {
+  if (is.null(data) || is.null(ID)) {
+    return(data)
+  }
+
+  if (!is.data.frame(data)) {
+    data <- as.data.frame(data, stringsAsFactors = FALSE)
+  }
+
+  if (nrow(data) != nrow(ID)) {
+    stop("Workflow MLPE metadata requires 'data' and 'ID' to have the same number of rows.")
+  }
+
+  pair_terms <- list()
+
+  if (all(c("pop1.ind", "pop2.ind", "pop1.pop", "pop2.pop") %in% names(ID))) {
+    data$.mlpe_ind1 <- ID$pop1.ind
+    data$.mlpe_ind2 <- ID$pop2.ind
+    data$.mlpe_grp1 <- ID$pop1.pop
+    data$.mlpe_grp2 <- ID$pop2.pop
+
+    pair_terms$pop <- c(".mlpe_ind1", ".mlpe_ind2")
+    pair_terms$grp <- c(".mlpe_grp1", ".mlpe_grp2")
+
+    if ("corr_" %in% names(ID)) {
+      data$.mlpe_corr <- ID$corr_
+      pair_terms$cor.grp <- list(
+        cols = c(".mlpe_ind1", ".mlpe_ind2"),
+        active = ".mlpe_corr"
+      )
+    }
+  } else if (all(c("pop1", "pop2") %in% names(ID))) {
+    data$.mlpe_pop1 <- ID$pop1
+    data$.mlpe_pop2 <- ID$pop2
+
+    pair_terms$pop <- c(".mlpe_pop1", ".mlpe_pop2")
+
+    if ("corr_" %in% names(ID)) {
+      data$.mlpe_corr <- ID$corr_
+      pair_terms$cor.grp <- list(
+        cols = c(".mlpe_pop1", ".mlpe_pop2"),
+        active = ".mlpe_corr"
+      )
+    }
+  }
+
+  if (length(pair_terms) > 0L) {
+    attr(data, "mlpe_pairs") <- pair_terms
+  }
+
+  data
+}
+
+
+.mlpe_formula_from_pair_terms <- function(response, predictor, pair_terms) {
+  rhs <- c(
+    predictor,
+    sprintf("(1 | %s)", names(pair_terms))
+  )
+
+  as.formula(paste(response, "~", paste(rhs, collapse = " + ")))
+}
+
+
+.mlpe_formula_from_data <- function(data,
+                                    response,
+                                    predictor,
+                                    fallback = NULL) {
+  pair_terms <- attr(data, "mlpe_pairs", exact = TRUE)
+
+  if (is.list(pair_terms) && length(pair_terms) > 0L) {
+    return(.mlpe_formula_from_pair_terms(response, predictor, pair_terms))
+  }
+
+  if (is.null(fallback)) {
+    stop("No MLPE pair metadata is attached to 'data', and no fallback formula was supplied.")
+  }
+
+  fallback
+}
+
+
 .mlpe_fit_mermod <- function(formula,
                              data,
                              REML = FALSE,
@@ -256,7 +338,7 @@ mlpe <- function(formula,
 
       levels_nm <- levels(reTrms$flist[[nm]])
       blocks[[i]] <- .mlpe_pair_block(data = data,
-                                      pair_cols = pair_terms[[nm]],
+                                      pair_term = pair_terms[[nm]],
                                       levels = levels_nm,
                                       term = nm)
     } else {
@@ -269,8 +351,9 @@ mlpe <- function(formula,
 }
 
 
-.mlpe_pair_block <- function(data, pair_cols, levels, term) {
-  pair_cols <- unname(pair_cols)
+.mlpe_pair_block <- function(data, pair_term, levels, term) {
+  pair_cols <- unname(pair_term$cols)
+  active <- .mlpe_pair_active(data, pair_term, term)
   x1 <- data[[pair_cols[[1]]]]
   x2 <- data[[pair_cols[[2]]]]
 
@@ -295,6 +378,12 @@ mlpe <- function(formula,
 
   Z1 <- Matrix::fac2sparse(f1, "d", drop = FALSE)
   Z2 <- Matrix::fac2sparse(f2, "d", drop = FALSE)
+
+  if (any(!active)) {
+    Z1[, !active] <- 0
+    Z2[, !active] <- 0
+  }
+
   Matrix::drop0(Z1 + Z2)
 }
 
@@ -369,17 +458,37 @@ mlpe <- function(formula,
   }
 
   out <- lapply(names(pairs), function(nm) {
-    cols <- pairs[[nm]]
+    pair_term <- pairs[[nm]]
 
+    if (is.character(pair_term) && length(pair_term) == 2L) {
+      pair_term <- list(cols = pair_term)
+    }
+
+    if (!is.list(pair_term) || is.null(pair_term$cols)) {
+      stop("Each element of 'pairs' must be a character vector of length two or a list with a 'cols' element.")
+    }
+
+    cols <- pair_term$cols
     if (!is.character(cols) || length(cols) != 2L) {
-      stop("Each element of 'pairs' must be a character vector of length two.")
+      stop("Each element of 'pairs' must define exactly two endpoint columns.")
     }
 
     if (!all(cols %in% names(data))) {
       stop("Endpoint columns for MLPE term '", nm, "' were not found in 'data'.")
     }
 
-    cols
+    active <- pair_term$active
+    if (!is.null(active)) {
+      if (!is.character(active) || length(active) != 1L) {
+        stop("The 'active' field for MLPE term '", nm, "' must name a single column in 'data'.")
+      }
+
+      if (!active %in% names(data)) {
+        stop("Active-row column '", active, "' for MLPE term '", nm, "' was not found in 'data'.")
+      }
+    }
+
+    list(cols = cols, active = active)
   })
 
   names(out) <- names(pairs)
@@ -389,9 +498,12 @@ mlpe <- function(formula,
 
 .mlpe_add_placeholders <- function(data, pair_terms) {
   for (nm in names(pair_terms)) {
-    cols <- pair_terms[[nm]]
-    levels_nm <- unique(c(as.character(data[[cols[[1]]]]),
-                          as.character(data[[cols[[2]]]])))
+    pair_term <- pair_terms[[nm]]
+    cols <- pair_term$cols
+    active <- .mlpe_pair_active(data, pair_term, nm)
+    levels_nm <- .mlpe_pair_levels(data[[cols[[1]]]],
+                                   data[[cols[[2]]]],
+                                   active = active)
 
     if (length(levels_nm) < 2L) {
       stop("MLPE term '", nm, "' must involve at least two distinct endpoints.")
@@ -405,11 +517,49 @@ mlpe <- function(formula,
       )
     }
 
-    data[[nm]] <- factor(rep(levels_nm, length.out = nrow(data)),
-                         levels = levels_nm)
+    existing_levels <- NULL
+    if (nm %in% names(data)) {
+      existing_levels <- unique(as.character(data[[nm]]))
+      existing_levels <- existing_levels[!is.na(existing_levels)]
+    }
+
+    if (!identical(sort(existing_levels), sort(levels_nm))) {
+      data[[nm]] <- factor(rep(levels_nm, length.out = nrow(data)),
+                           levels = levels_nm)
+    }
   }
 
   data
+}
+
+
+.mlpe_pair_levels <- function(x1, x2, active) {
+  used_levels <- unique(c(as.character(x1[active]), as.character(x2[active])))
+
+  if (is.factor(x1) || is.factor(x2)) {
+    level_order <- unique(c(
+      if (is.factor(x1)) levels(x1) else as.character(x1[active]),
+      if (is.factor(x2)) levels(x2) else as.character(x2[active])
+    ))
+
+    return(level_order[level_order %in% used_levels])
+  }
+
+  used_levels
+}
+
+
+.mlpe_pair_active <- function(data, pair_term, term) {
+  if (is.null(pair_term$active)) {
+    return(rep(TRUE, nrow(data)))
+  }
+
+  active <- as.logical(data[[pair_term$active]])
+  if (length(active) != nrow(data) || any(is.na(active))) {
+    stop("Active-row column for MLPE term '", term, "' must be a non-missing logical or 0/1 vector with one value per observation.")
+  }
+
+  active
 }
 
 

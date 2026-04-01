@@ -509,3 +509,93 @@ test_that("MLPE.lmm_coef reads distance-matrix outputs and returns coefficient t
   expect_true(is.matrix(out) || is.data.frame(out))
   expect_true(any(rownames(out) %in% "surface"))
 })
+
+test_that("workflow dyad metadata matches legacy ZZ fitting for expanded IDs", {
+  id <- ResistanceGA2::To.From.ID(
+    sampled_pops = 4,
+    pop_n = c(1L, 2L, 1L, 1L)
+  )
+  zz <- ResistanceGA2:::ZZ.mat(id)
+
+  set.seed(99)
+  dat_attr <- data.frame(
+    gd = rnorm(nrow(id)),
+    cd = scale(seq_len(nrow(id))),
+    pop = id$pop,
+    grp = id$pop1.pop
+  )
+  dat_attr <- ResistanceGA2:::.mlpe_attach_workflow_pairs(dat_attr, id)
+
+  fit_attr <- ResistanceGA2::mlpe_rga(
+    gd ~ cd + (1 | pop) + (1 | grp),
+    data = dat_attr,
+    ZZ = zz,
+    REML = FALSE
+  )
+
+  dat_legacy <- dat_attr
+  attr(dat_legacy, "mlpe_pairs") <- NULL
+
+  fit_legacy <- ResistanceGA2::mlpe_rga(
+    gd ~ cd + (1 | pop) + (1 | grp),
+    data = dat_legacy,
+    ZZ = zz,
+    REML = FALSE
+  )
+
+  expect_equal(as.numeric(logLik(fit_attr)),
+               as.numeric(logLik(fit_legacy)),
+               tolerance = 1e-8)
+  expect_equal(unname(lme4::fixef(fit_attr)),
+               unname(lme4::fixef(fit_legacy)),
+               tolerance = 1e-8)
+})
+
+test_that("workflow dyad metadata matches legacy ZZ fitting for correlation groups", {
+  pts <- terra::vect(
+    matrix(
+      c(0, 0,
+        0.5, 0,
+        3, 0,
+        4, 0),
+      ncol = 2,
+      byrow = TRUE
+    ),
+    type = "points"
+  )
+  id <- ResistanceGA2::To.From.ID(4, spLoc = pts, nb = 1.1)
+  zz <- ResistanceGA2:::ZZ.mat(id)
+
+  set.seed(123)
+  dat_attr <- data.frame(
+    gd = rnorm(nrow(id)),
+    cd = scale(seq_len(nrow(id))),
+    pop = id$pop1,
+    cor.grp = id$cor.grp
+  )
+  dat_attr <- ResistanceGA2:::.mlpe_attach_workflow_pairs(dat_attr, id)
+
+  fit_attr <- ResistanceGA2::mlpe_rga(
+    gd ~ cd + (1 | pop) + (1 | cor.grp),
+    data = dat_attr,
+    ZZ = zz,
+    REML = FALSE
+  )
+
+  dat_legacy <- dat_attr
+  attr(dat_legacy, "mlpe_pairs") <- NULL
+
+  fit_legacy <- ResistanceGA2::mlpe_rga(
+    gd ~ cd + (1 | pop) + (1 | cor.grp),
+    data = dat_legacy,
+    ZZ = zz,
+    REML = FALSE
+  )
+
+  expect_equal(as.numeric(logLik(fit_attr)),
+               as.numeric(logLik(fit_legacy)),
+               tolerance = 1e-8)
+  expect_equal(unname(lme4::fixef(fit_attr)),
+               unname(lme4::fixef(fit_legacy)),
+               tolerance = 1e-8)
+})

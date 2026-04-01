@@ -143,10 +143,23 @@ MLPE.lmm2 <- function(resistance, response, REML = FALSE, ID, ZZ) {
     colnames(dat) <- c("pop1", "pop2", "resistance", "response")
     
   }
-  # Assign value to layer
-  #   LAYER<-assign("Resist",value=dat$resistance)
-  
-  # Fit model
+
+  dat <- .mlpe_attach_workflow_pairs(dat, ID)
+  pair_terms <- attr(dat, "mlpe_pairs", exact = TRUE)
+
+  if (is.list(pair_terms) && length(pair_terms) > 0L) {
+    formula <- .mlpe_formula_from_pair_terms("response",
+                                             "scale(resistance)",
+                                             pair_terms)
+
+    return(
+      mlpe_rga(formula = formula,
+               data = dat,
+               REML = REML,
+               ZZ = ZZ)
+    )
+  }
+
   mod <-
     lme4::lFormula(response ~ scale(resistance) + (1 | pop1),
                    data = dat,

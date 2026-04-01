@@ -636,12 +636,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -861,12 +861,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -957,12 +957,12 @@ SS_optim <- function(gdist.inputs = NULL,
             col.names = F
           )
           
-          fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                               data = dat,
                               ZZ = gdist.inputs$ZZ,
                               REML = FALSE)
           
-          fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                    data = dat,
                                    ZZ = gdist.inputs$ZZ,
                                    REML = TRUE)
@@ -1025,22 +1025,21 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(gdist.inputs$ID, response = gdist.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- gdist.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- gdist.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .mlpe_formula_from_data(
+              dat,
+              response = "gd",
+              predictor = "1",
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = gdist.inputs$ZZ,
+            REML = FALSE
+          )
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(gdist.inputs$ID)
           k <- 1
           
@@ -1220,7 +1219,7 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
@@ -1445,7 +1444,7 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
@@ -1668,12 +1667,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -1893,12 +1892,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -1989,12 +1988,12 @@ SS_optim <- function(gdist.inputs = NULL,
             col.names = F
           )
           
-          fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                               data = dat,
                               ZZ = gdist.inputs$ZZ,
                               REML = FALSE)
           
-          fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                    data = dat,
                                    ZZ = gdist.inputs$ZZ,
                                    REML = TRUE)
@@ -2056,22 +2055,21 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(gdist.inputs$ID, response = gdist.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- gdist.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- gdist.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .mlpe_formula_from_data(
+              dat,
+              response = "gd",
+              predictor = "1",
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = gdist.inputs$ZZ,
+            REML = FALSE
+          )
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(gdist.inputs$ID)
           k <- 1
           
@@ -2992,22 +2990,21 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- jl.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- jl.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .mlpe_formula_from_data(
+              dat,
+              response = "gd",
+              predictor = "1",
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = jl.inputs$ZZ,
+            REML = FALSE
+          )
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(jl.inputs$ID)
           k <- 1
           
@@ -3530,22 +3527,21 @@ SS_optim <- function(gdist.inputs = NULL,
           }
           
           if (null_mod == TRUE) {
-            dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-            colnames(dat) <- c("pop1", "pop2", "response")
-            
-            # Fit model
-            mod <-
-              lFormula(response ~ 1 + (1 | pop1),
-                       data = dat,
-                       REML = FALSE)
-            mod$reTrms$Zt <- jl.inputs$ZZ
-            dfun <- do.call(mkLmerDevfun, mod)
-            opt <- optimizeLmer(dfun)
-            
-            fit.stats <-
-              r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-            LL <-
-              logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+            dat <- jl.inputs$df
+            fit.null <- mlpe_rga(
+              formula = .mlpe_formula_from_data(
+                dat,
+                response = "gd",
+                predictor = "1",
+                fallback = gd ~ 1 + (1 | pop)
+              ),
+              data = dat,
+              ZZ = jl.inputs$ZZ,
+              REML = FALSE
+            )
+
+            fit.stats <- r.squaredGLMM(fit.null)
+            LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
             
@@ -4088,22 +4084,21 @@ SS_optim <- function(gdist.inputs = NULL,
           }
           
           if (null_mod == TRUE) {
-            dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-            colnames(dat) <- c("pop1", "pop2", "response")
-            
-            # Fit model
-            mod <-
-              lFormula(response ~ 1 + (1 | pop1),
-                       data = dat,
-                       REML = FALSE)
-            mod$reTrms$Zt <- jl.inputs$ZZ
-            dfun <- do.call(mkLmerDevfun, mod)
-            opt <- optimizeLmer(dfun)
-            
-            fit.stats <-
-              r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-            LL <-
-              logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+            dat <- jl.inputs$df
+            fit.null <- mlpe_rga(
+              formula = .mlpe_formula_from_data(
+                dat,
+                response = "gd",
+                predictor = "1",
+                fallback = gd ~ 1 + (1 | pop)
+              ),
+              data = dat,
+              ZZ = jl.inputs$ZZ,
+              REML = FALSE
+            )
+
+            fit.stats <- r.squaredGLMM(fit.null)
+            LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
             
