@@ -1,0 +1,242 @@
+---
+title: "Direct Circuitscape Runs from R"
+author: "Bill Peterman"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: rmarkdown::html_vignette
+vignette: |
+  %\VignetteIndexEntry{Direct Circuitscape Runs from R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(ResistanceGA2)
+library(terra)
+```
+
+# Overview
+
+`Run_CS.ini()` is a low-level Circuitscape wrapper for cases where you want to
+run Circuitscape directly from R without going through the optimization
+workflow.
+
+It complements `Run_CS.jl()` rather than replacing it.
+
+- `Run_CS.jl()` is tailored to the package optimization workflow.
+- `Run_CS.ini()` is tailored to direct Circuitscape runs.
+- Both use Julia and `Circuitscape.jl` through `JuliaConnectoR`.
+
+The main advantage of `Run_CS.ini()` is that it lets you work from R objects
+while still thinking in terms of the Circuitscape `.ini` file.
+
+# Julia Setup
+
+You still need Julia and `Circuitscape.jl` installed.
+
+```{r julia-home, eval=FALSE}
+JULIA_HOME <- "C:/Users/your-name/AppData/Local/Programs/Julia-1.11.4/bin/"
+Sys.setenv(JULIA_BINDIR = JULIA_HOME)
+```
+
+```{r julia-home-run, include=FALSE}
+JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia-1.11.4/bin/"
+Sys.setenv(JULIA_BINDIR = JULIA_HOME)
+```
+
+# Example Inputs
+
+```{r example-inputs}
+pts <- vect(samples[, 2:3], type = "points")
+surface <- resistance_surfaces[["continuous"]]
+
+pts
+surface
+```
+
+# Pairwise Circuitscape with INI-Style Options
+
+```{r run-cs-ini-pairwise, eval=FALSE}
+pairwise_out <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "pairwise",
+  connect_four_neighbors_only = TRUE,
+  write_cur_maps = TRUE,
+  write_cum_cur_map_only = TRUE,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+The returned object includes the raw Julia result, a parsed pairwise matrix
+when one can be extracted, any current map written by Circuitscape, the final
+config, and the paths to generated files.
+
+```{r inspect-cs-ini, eval=FALSE}
+names(pairwise_out)
+pairwise_out$ini_file
+pairwise_out$pairwise_matrix
+pairwise_out$config
+```
+
+# Working from R Objects Instead of Manual Files
+
+`Run_CS.ini()` can now write several Circuitscape support files directly from R
+objects.
+
+Supported convenience inputs include:
+
+- `mask_file`
+- `source_file`
+- `ground_file`
+- `included_pairs_file`
+- `reclass_file`
+
+## Advanced mode with source and ground rasters
+
+```{r advanced-raster-mode, eval=FALSE}
+source_r <- rast(surface)
+ground_r <- rast(surface)
+mask_r <- rast(surface)
+
+source_vals <- rep(0, ncell(source_r))
+ground_vals <- rep(0, ncell(ground_r))
+source_vals[5] <- 1
+ground_vals[ncell(ground_r) - 4] <- 1
+
+values(source_r) <- source_vals
+values(ground_r) <- ground_vals
+values(mask_r) <- 1
+
+advanced_out <- Run_CS.ini(
+  r = surface,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "advanced",
+  source_file = source_r,
+  ground_file = ground_r,
+  ground_file_is_resistances = FALSE,
+  mask_file = mask_r,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+## Included pairs from an R table
+
+```{r included-pairs, eval=FALSE}
+keep_pairs <- data.frame(
+  node1 = c(1, 1, 2),
+  node2 = c(2, 3, 4)
+)
+
+pairwise_subset <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  included_pairs_file = keep_pairs,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+Use exclude mode by passing a small list:
+
+```{r exclude-pairs, eval=FALSE}
+pairwise_exclude <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  included_pairs_file = list(
+    mode = "exclude",
+    pairs = keep_pairs
+  ),
+  return = "all"
+)
+```
+
+## Reclassification tables from R
+
+```{r reclass-table, eval=FALSE}
+reclass_tbl <- data.frame(
+  from = c(1, 2, 3),
+  to = c(5, 25, 100)
+)
+
+reclass_out <- Run_CS.ini(
+  r = resistance_surfaces[["categorical"]],
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  reclass_file = reclass_tbl,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+Based on inspection of the current `Circuitscape.jl` source, I infer that
+`reclass_file` remains part of the config template but may not yet be fully
+acted on upstream. `Run_CS.ini()` still writes that file correctly from R.
+
+# Existing Paths Still Work
+
+If you already have files prepared on disk, you can still pass them directly.
+
+```{r existing-paths, eval=FALSE}
+Run_CS.ini(
+  r = "my_surface.asc",
+  CS_Point.File = "my_points.txt",
+  JULIA_HOME = JULIA_HOME,
+  mask_file = "mask.asc",
+  source_file = "sources.asc",
+  ground_file = "grounds.asc",
+  included_pairs_file = "pairs.txt",
+  return = "all"
+)
+```
+
+# Inspecting the Generated INI
+
+Keeping the files can be useful while debugging or comparing against a
+hand-written Circuitscape setup.
+
+```{r inspect-ini, eval=FALSE}
+out <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "pairwise",
+  return = "all",
+  rm.files = FALSE
+)
+
+readLines(out$ini_file)
+```
+
+# Return Modes
+
+```{r return-modes, eval=FALSE}
+raw_out <- Run_CS.ini(..., return = "compute")
+matrix_out <- Run_CS.ini(..., return = "matrix")
+map_out <- Run_CS.ini(..., return = "current_map")
+all_out <- Run_CS.ini(..., return = "all")
+```
+
+- `compute` returns the raw Julia object
+- `matrix` returns a parsed pairwise matrix when possible
+- `current_map` returns the cumulative current map raster when written
+- `all` returns the full bundle
+
+# Relationship to the Optimization Workflow
+
+If your goal is landscape genetic optimization, the usual workflow is still:
+
+1. `GA.prep()`
+2. `gdist.prep()` or `jl.prep()`
+3. `SS_optim()`, `MS_optim()`, or `all_comb()`
+
+Use `Run_CS.ini()` when you want more direct access to Circuitscape itself,
+especially for advanced mode or for explicit `.ini`-style control.

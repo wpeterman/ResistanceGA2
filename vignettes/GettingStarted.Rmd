@@ -202,6 +202,16 @@ ss_out <- SS_optim(
 )
 ```
 
+The returned object now has an S3 class with built-in `print()`, `summary()`,
+and `plot()` methods.
+
+```{r ss-s3, eval=FALSE}
+class(ss_out)
+print(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
 ## Multisurface optimization
 
 ```{r ms-workflow, eval=FALSE}
@@ -210,6 +220,15 @@ ms_out <- MS_optim(
   GA.inputs = GA.inputs,
   diagnostic_plots = FALSE
 )
+```
+
+Multisurface results support the same style of inspection.
+
+```{r ms-s3, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+plot(ms_out, type = "fit")
 ```
 
 ## All-combinations analysis
@@ -239,6 +258,14 @@ all_out <- all_comb(
   iters = 10,
   replicate = 1
 )
+```
+
+`all_comb()` results also have S3 methods.
+
+```{r all-comb-s3, eval=FALSE}
+class(all_out)
+summary(all_out)
+plot(all_out)
 ```
 
 # Transformations and Inspection
@@ -274,6 +301,10 @@ The main optimization functions return lists containing:
 - AICc tables for model comparison
 - Pairwise distance objects used downstream
 - saved plot and table outputs beneath the specified `Results.dir`
+
+These objects still keep their original list structure, so existing code using
+`$AICc`, `$AICc.tab`, `$cd`, `$k`, and related components continues to work.
+The new S3 classes add a cleaner interactive layer on top of that structure.
 
 For larger or slower analyses, it is often worth running multiple replicates and
 checking for consistency in the top-supported surfaces and parameter estimates.

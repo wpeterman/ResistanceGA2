@@ -230,6 +230,15 @@ ss_out <- SS_optim(
 )
 ```
 
+The optimization result is still a named list, but it now carries an S3 class
+with package methods for `print()`, `summary()`, and `plot()`.
+
+```{r ss-optim-s3, eval=FALSE}
+class(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
 ## Multi-Surface Optimization
 
 ```{r ms-optim, eval=FALSE}
@@ -238,6 +247,13 @@ ms_out <- MS_optim(
   GA.inputs = ga_inputs,
   diagnostic_plots = FALSE
 )
+```
+
+```{r ms-optim-s3, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+plot(ms_out, type = "fit")
 ```
 
 If you want to reconstruct the optimized composite surface after a multisurface run:
@@ -272,6 +288,12 @@ combo_out <- all_comb(
   iters = 10,
   replicate = 1
 )
+```
+
+```{r all-comb-s3, eval=FALSE}
+class(combo_out)
+summary(combo_out)
+plot(combo_out)
 ```
 
 # Working with Transformations
@@ -425,6 +447,10 @@ current_map <- Run_CS.jl(
   EXPORT.dir = results_dir
 )
 ```
+
+If you want direct `.ini`-style access to Circuitscape from R, use
+`Run_CS.ini()` instead of `Run_CS.jl()`. That lower-level wrapper is described
+in the `Direct Circuitscape Runs from R` vignette.
 
 # Migration Notes
 

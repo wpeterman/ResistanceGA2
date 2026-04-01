@@ -122,6 +122,29 @@ length(vignette_pairwise_outputs$circuitscape_matrix)
 head(vignette_pairwise_outputs$circuitscape_matrix)
 ```
 
+## Direct Circuitscape runs with `.ini`-style control
+
+If you want fuller control over Circuitscape options than `Run_CS.jl()` is
+designed to expose, use `Run_CS.ini()`.
+
+```{r run-cs-ini, eval=FALSE}
+cs_out <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "pairwise",
+  connect_four_neighbors_only = TRUE,
+  write_cur_maps = TRUE,
+  write_cum_cur_map_only = TRUE,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+See the separate `Direct Circuitscape Runs from R` vignette for examples using
+advanced mode, source and ground inputs, included-pairs files, and other
+Circuitscape support files.
+
 ## Current maps
 
 To compute a cumulative current map, set `CurrentMap = TRUE` and request raster
@@ -173,6 +196,15 @@ ss_out <- SS_optim(
 )
 ```
 
+These optimization outputs are now S3 objects, so routine inspection is
+cleaner than before.
+
+```{r julia-s3-ss, eval=FALSE}
+class(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
 For multiple surfaces:
 
 ```{r julia-ms, eval=FALSE}
@@ -191,6 +223,12 @@ ms_out <- MS_optim(
   GA.inputs = GA.inputs_multi,
   diagnostic_plots = FALSE
 )
+```
+
+```{r julia-s3-ms, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
 ```
 
 # Tuning and Troubleshooting
