@@ -63,65 +63,18 @@ mlpe_rga <-
            ZZ = NULL,
            keep = NULL,
            ...) {
-    
-    
-    if(!inherits(formula, 'formula')) {
-      formula <- as.formula(formula)
-    }
-    
-    if(is.null(ZZ)) {
+    if (is.null(ZZ)) {
       obs <- 0.5 * (sqrt((8 * nrow(data)) + 1) + 1)
       ID <- To.From.ID(obs)
       ZZ <- ZZ.mat(ID)
     }
-    
-    if(!is.null(keep)) {
-      data <- data[keep == 1,]
-      ZZ <- ZZ[,keep == 1]
-      pop <- ID$pop1[keep == 1]
-      miss.pops <- as.character(pop)
-      
-      ## Reduce ZZ
-      ZZ <- ZZ[rownames(ZZ) %in% unique(miss.pops),]
-    }
-    
-    
-    # Fit merMod --------------------------------------------------------------
-    
-    
-    # > glmer -----------------------------------------------------------------
-    args <- list(...)
-    
-    if(any("family" %in% names(args))) {
-      if(isTRUE(REML)) {
-        cat("REML will be ignored when fitting a generalized MLPE model.")
-      }
-      mod <-
-        lme4::glFormula(formula,
-                        data = data,
-                        ...)
-      mod$reTrms$Zt <- ZZ
-      dfun <- do.call(lme4::mkGlmerDevfun, mod)
-      opt <- lme4::optimizeGlmer(dfun)
-      
-    } else {
-      
-      # > lmer ---------------------------------------------------------------
-      
-      mod <-
-        lme4::lFormula(formula,
-                       data = data,
-                       REML = REML)
-      mod$reTrms$Zt <- ZZ
-      dfun <- do.call(lme4::mkLmerDevfun, mod)
-      opt <- lme4::optimizeLmer(dfun)
-      
-    }
-    
-    MOD <-
-      (lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-    
-    return(MOD)
+
+    .mlpe_fit_mermod(formula = formula,
+                     data = data,
+                     REML = REML,
+                     ZZ = ZZ,
+                     keep = keep,
+                     ...)
   }
 
 

@@ -1,0 +1,38 @@
+% Generated manually for new MLPE interface
+\name{mlpe_data}
+\alias{mlpe_data}
+\title{Build Long-Form Data for MLPE Models}
+\usage{
+mlpe_data(response, ..., pairs = NULL, labels = NULL, pair_names = c("from",
+  "to"), keep = NULL)
+}
+\arguments{
+\item{response}{Pairwise response as a lower-triangle vector, symmetric matrix, \code{dist} object, or a long vector aligned with \code{pairs}.}
+
+\item{...}{Named pairwise covariates supplied in the same format as \code{response}.}
+
+\item{pairs}{Optional data frame or matrix containing at least two columns that identify the endpoints for each observation. When supplied, \code{response} and all covariates are treated as long vectors aligned to these rows. Additional columns in \code{pairs} are preserved.}
+
+\item{labels}{Optional vector of endpoint labels used when converting a symmetric matrix, \code{dist} object, or lower-triangle vector.}
+
+\item{pair_names}{Names to use for the generated endpoint columns when \code{pairs} is not supplied.}
+
+\item{keep}{Optional logical/integer vector used to retain a subset of pair observations.}
+}
+\value{
+A data frame with one row per retained pairwise observation.
+}
+\description{
+Convert pairwise responses and covariates into a long-form data frame that is ready for \code{\link[ResistanceGA2]{mlpe}}. Inputs can be supplied either as symmetric matrices/\code{dist} objects, or as long vectors paired with an explicit two-column pair index.
+}
+\examples{
+y <- matrix(rnorm(25), 5)
+x <- matrix(rnorm(25), 5)
+
+dat <- mlpe_data(response = y, resistance = x)
+
+head(dat)
+
+id <- data.frame(from = c(1, 1, 2), to = c(2, 3, 3))
+mlpe_data(response = c(0.2, 0.4, 0.6), x = c(1, 2, 3), pairs = id)
+}

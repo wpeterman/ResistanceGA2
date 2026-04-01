@@ -106,23 +106,26 @@ MLPE.lmm <-
       }
     }
     
+    if (is.null(ID) && is.null(ZZ)) {
+      dat <- mlpe_data(response = response, resistance = cs.matrix)
+
+      return(
+        mlpe(
+          formula = response ~ resistance + (1 | pair),
+          data = dat,
+          pairs = c("from", "to"),
+          REML = REML
+        )
+      )
+    }
+
     dat <- data.frame(ID, resistance = cs.matrix, response = response)
     colnames(dat) <- c("pop1", "pop2", "resistance", "response")
-    
-    # Assign value to layer
-    #     LAYER<-assign("Resist",value=dat$cs.matrix)
-    
-    # Fit model
-    mod <-
-      lme4::lFormula(response ~ resistance + (1 | pop1),
-                     data = dat,
-                     REML = REML)
-    mod$reTrms$Zt <- ZZ
-    dfun <- do.call(lme4::mkLmerDevfun, mod)
-    opt <- lme4::optimizeLmer(dfun)
-    MOD <-
-      (lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-    return(MOD)
+
+    mlpe_rga(formula = response ~ resistance + (1 | pop1),
+             data = dat,
+             REML = REML,
+             ZZ = ZZ)
   }
 
 
