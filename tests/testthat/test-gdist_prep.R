@@ -18,7 +18,9 @@ make_gd <- function(n, seed = 2) {
 test_that("gdist.prep returns list with all expected names", {
   coords <- make_points(10)
   gd     <- make_gd(10)
-  out    <- gdist.prep(n.Pops = 10, response = gd, samples = coords)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 10, response = gd, samples = coords)
+  )
   expected <- c("response", "samples", "covariates", "formula",
                 "transitionFunction", "directions", "ID", "ZZ",
                 "keep", "n.Pops", "longlat", "method", "df")
@@ -36,7 +38,9 @@ test_that("gdist.prep ZZ has dimensions n × choose(n,2)", {
   n      <- 7
   coords <- make_points(n)
   gd     <- make_gd(n)
-  out    <- gdist.prep(n.Pops = n, response = gd, samples = coords)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = n, response = gd, samples = coords)
+  )
   expect_equal(nrow(out$ZZ), n)
   expect_equal(ncol(out$ZZ), choose(n, 2))
 })
@@ -44,14 +48,18 @@ test_that("gdist.prep ZZ has dimensions n × choose(n,2)", {
 test_that("gdist.prep default formula is gd ~ cd + (1 | pop)", {
   coords <- make_points(10)
   gd     <- make_gd(10)
-  out    <- gdist.prep(n.Pops = 10, response = gd, samples = coords)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 10, response = gd, samples = coords)
+  )
   expect_equal(deparse(out$formula), "gd ~ cd + (1 | pop)")
 })
 
 test_that("gdist.prep df has gd and pop columns when response supplied", {
   coords <- make_points(8)
   gd     <- make_gd(8)
-  out    <- gdist.prep(n.Pops = 8, response = gd, samples = coords)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 8, response = gd, samples = coords)
+  )
   expect_true(all(c("gd", "pop") %in% names(out$df)))
   expect_equal(nrow(out$df), choose(8, 2))
 })
@@ -59,7 +67,9 @@ test_that("gdist.prep df has gd and pop columns when response supplied", {
 test_that("gdist.prep attaches MLPE dyad metadata that matches legacy ZZ fitting", {
   coords <- make_points(6)
   gd <- make_gd(6)
-  out <- gdist.prep(n.Pops = 6, response = gd, samples = coords, method = "costDistance")
+  out <- suppressWarnings(
+    gdist.prep(n.Pops = 6, response = gd, samples = coords, method = "costDistance")
+  )
 
   expect_named(attr(out$df, "mlpe_pairs"), "pop")
 
@@ -136,8 +146,10 @@ test_that("gdist.prep errors on unsupported min.max_dist", {
   coords <- make_points(10)
   gd     <- make_gd(10)
   expect_error(
-    gdist.prep(n.Pops = 10, response = gd, samples = coords,
-               min.max_dist = c(0, 50)),
+    suppressWarnings(
+      gdist.prep(n.Pops = 10, response = gd, samples = coords,
+                 min.max_dist = c(0, 50))
+    ),
     "not yet supported"
   )
 })
@@ -148,7 +160,9 @@ test_that("gdist.prep accepts SpatVector samples", {
   coords <- make_coords(10)
   sv     <- terra::vect(coords, type = "points")
   gd     <- make_gd(10)
-  out    <- gdist.prep(n.Pops = 10, response = gd, samples = sv)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 10, response = gd, samples = sv)
+  )
   expect_equal(as.numeric(out$samples), as.numeric(coords))
 })
 
@@ -185,8 +199,10 @@ test_that("gdist.prep incorporates covariates into df", {
   gd     <- make_gd(8)
   n_pairs <- choose(8, 2)
   cov    <- data.frame(elevation = runif(n_pairs))
-  out    <- gdist.prep(n.Pops = 8, response = gd, samples = coords,
-                       covariates = cov)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 8, response = gd, samples = coords,
+               covariates = cov)
+  )
   expect_true("elevation" %in% names(out$df))
 })
 
@@ -196,8 +212,10 @@ test_that("gdist.prep updates formula when covariates and formula supplied", {
   n_pairs <- choose(8, 2)
   cov    <- data.frame(elev = runif(n_pairs))
   fml    <- as.formula("response ~ elev")
-  out    <- gdist.prep(n.Pops = 8, response = gd, samples = coords,
-                       covariates = cov, formula = fml)
+  out    <- suppressWarnings(
+    gdist.prep(n.Pops = 8, response = gd, samples = coords,
+               covariates = cov, formula = fml)
+  )
   # Updated formula should contain cd
   expect_true(grepl("cd", deparse(out$formula)))
 })

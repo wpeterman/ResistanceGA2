@@ -563,7 +563,9 @@ test_that("workflow dyad metadata matches legacy ZZ fitting for correlation grou
     ),
     type = "points"
   )
-  id <- ResistanceGA2::To.From.ID(4, spLoc = pts, nb = 1.1)
+  id <- suppressWarnings(
+    ResistanceGA2::To.From.ID(4, spLoc = pts, nb = 1.1)
+  )
   zz <- ResistanceGA2:::ZZ.mat(id)
 
   set.seed(123)
