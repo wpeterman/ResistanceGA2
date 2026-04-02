@@ -72,8 +72,16 @@ Combine_Surfaces <-
       EXPORT.dir <- out
     }
 
+    materialize_raster <- function(x) {
+      if (inherits(x, "PackedSpatRaster")) {
+        terra::unwrap(x)
+      } else {
+        x
+      }
+    }
+
     select.trans <- GA.inputs$select.trans
-    r    <- GA.inputs$Resistance.stack
+    r    <- materialize_raster(GA.inputs$Resistance.stack)
     keep <- 1
 
     for (i in seq_len(GA.inputs$n.layers)) {

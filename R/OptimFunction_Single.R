@@ -33,9 +33,17 @@ Resistance.Opt_single <-
     t1   <- Sys.time()
     iter <- iter %||% 1L
 
+    materialize_raster <- function(x) {
+      if (inherits(x, "PackedSpatRaster")) {
+        terra::unwrap(x)
+      } else {
+        x
+      }
+    }
+
     method       <- GA.inputs$method
     select.trans <- GA.inputs$select.trans
-    r            <- Resistance
+    r            <- materialize_raster(Resistance)
     keep         <- 1L
 
     # Categorical surface -------------------------------------------------------

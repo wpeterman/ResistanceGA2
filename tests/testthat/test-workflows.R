@@ -40,7 +40,7 @@ make_pairwise_example <- function(n = 5, seed = 1) {
   )
 }
 
-make_smoke_inputs <- function(raster, prefix) {
+make_smoke_inputs <- function(raster, prefix, parallel = FALSE) {
   samples_df <- get_pkg_data("samples")
   pts <- terra::vect(samples_df[, 2:3], type = "points")
   response <- ResistanceGA2::lower(as.matrix(dist(samples_df[, 2:3])))
@@ -59,13 +59,14 @@ make_smoke_inputs <- function(raster, prefix) {
       maxiter = 1,
       run = 1,
       seed = 1,
+      parallel = parallel,
       monitor = FALSE,
       quiet = TRUE
     )
   )
 }
 
-make_covariate_smoke_inputs <- function(raster, prefix, n = 8) {
+make_covariate_smoke_inputs <- function(raster, prefix, n = 8, parallel = FALSE) {
   samples_df <- get_pkg_data("samples")[seq_len(n), , drop = FALSE]
   pts <- terra::vect(samples_df[, 2:3], type = "points")
   response_base <- ResistanceGA2::lower(as.matrix(dist(samples_df[, 2:3])))
@@ -88,6 +89,7 @@ make_covariate_smoke_inputs <- function(raster, prefix, n = 8) {
       maxiter = 1,
       run = 1,
       seed = 1,
+      parallel = parallel,
       monitor = FALSE,
       quiet = TRUE
     )
@@ -396,4 +398,46 @@ test_that("MS_optim covers the covariate branch", {
   expect_s3_class(ms_out$AICc.tab, "data.frame")
   expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
   expect_true(nrow(ms_out$percent.contribution) >= 2L)
+})
+
+test_that("Windows parallel SS_optim completes a minimal workflow", {
+  skip_if(.Platform$OS.type != "windows", "Windows-specific regression test")
+
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, "continuous"),
+    prefix = "ss-optim-parallel-",
+    parallel = 2
+  )
+
+  ss_out <- ResistanceGA2::SS_optim(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = inputs$ga,
+    dist_mod = FALSE,
+    null_mod = FALSE,
+    diagnostic_plots = FALSE
+  )
+
+  expect_s3_class(ss_out, "resga_ss_optim")
+  expect_true("continuous" %in% ss_out$AICc$Surface)
+})
+
+test_that("Windows parallel MS_optim completes the multisurface covariate workflow", {
+  skip_if(.Platform$OS.type != "windows", "Windows-specific regression test")
+
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_covariate_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    prefix = "ms-optim-parallel-",
+    parallel = 2
+  )
+
+  ms_out <- ResistanceGA2::MS_optim(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = inputs$ga,
+    diagnostic_plots = FALSE
+  )
+
+  expect_s3_class(ms_out, "resga_ms_optim")
+  expect_true(nrow(ms_out$AICc.tab) >= 1L)
 })

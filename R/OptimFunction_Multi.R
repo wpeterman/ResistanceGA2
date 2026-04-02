@@ -21,10 +21,19 @@ Resistance.Opt_multi <- function(PARM,
                                  GA.inputs,
                                  Min.Max      = "max",
                                  quiet        = FALSE) {
+  materialize_raster <- function(x) {
+    if (inherits(x, "PackedSpatRaster")) {
+      terra::unwrap(x)
+    } else {
+      x
+    }
+  }
 
   t1        <- proc.time()[3]
   method    <- GA.inputs$method
   File.name <- "resist_surface"
+  worker.inputs <- GA.inputs
+  worker.inputs$Resistance.stack <- materialize_raster(GA.inputs$Resistance.stack)
 
   obj.func.opt <- -99999   # default
 
@@ -33,7 +42,7 @@ Resistance.Opt_multi <- function(PARM,
     r <- Combine_Surfaces(
       PARM         = PARM,
       gdist.inputs = gdist.inputs,
-      GA.inputs    = GA.inputs,
+      GA.inputs    = worker.inputs,
       out          = NULL,
       File.name    = File.name,
       rescale      = FALSE
@@ -65,7 +74,7 @@ Resistance.Opt_multi <- function(PARM,
     r <- Combine_Surfaces(
       PARM      = PARM,
       jl.inputs = jl.inputs,
-      GA.inputs = GA.inputs,
+      GA.inputs = worker.inputs,
       out       = NULL,
       File.name = File.name,
       rescale   = FALSE

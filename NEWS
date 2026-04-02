@@ -1,3 +1,8 @@
+ResistanceGA2 1.1.2
+---------
+* Fixed Windows parallel optimization for raster-based workflows
+* Added IBE/IBR vignette builder support for multi-core execution
+
 ResistanceGA2 1.1.1
 ---------
 * Expanded unit tests
