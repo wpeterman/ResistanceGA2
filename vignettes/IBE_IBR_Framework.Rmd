@@ -234,6 +234,61 @@ pair_data <- mlpe_data(
 head(pair_data)
 ```
 
+# Optional: Multiple Dyadic Random Effects
+
+The examples above use one MLPE dyad term, `(1 | pair)`, where `pair` is built
+from the `from` and `to` site columns. The current `mlpe()` implementation can
+also include **more than one separate dyadic random-intercept term** in the same
+model, as long as each term is linked to its own pair of endpoint columns
+through the `pairs` argument.
+
+This can be useful when pairwise observations share endpoints at multiple
+sampling scales. For example, we may want one dyadic random effect for repeated
+use of the same sampled sites and a second dyadic random effect for repeated use
+of broader region labels attached to those sites.
+
+One current constraint is that each dyadic term still expects the two endpoint
+labels to differ within every row for that term. A coarse region-level dyadic
+effect therefore works naturally for **between-region** pairs, but not for
+within-region rows where `from_region == to_region`. The example below keeps
+only between-region observations so the two-term fit is well-defined.
+
+```{r multiple-dyad-terms}
+site_region <- setNames(
+  ifelse(sites$x <= stats::median(sites$x), "west", "east"),
+  as.character(sites$demo_id)
+)
+
+pair_data_region <- pair_data
+pair_data_region$from_region <- site_region[as.character(pair_data_region$from)]
+pair_data_region$to_region <- site_region[as.character(pair_data_region$to)]
+pair_data_region <- pair_data_region[
+  pair_data_region$from_region != pair_data_region$to_region,
+  ,
+  drop = FALSE
+]
+rownames(pair_data_region) <- NULL
+
+m_site_region <- mlpe(
+  response ~ geo + cti_diff + hli_diff +
+    (1 | site_pair) + (1 | region_pair),
+  data = pair_data_region,
+  pairs = list(
+    site_pair = c("from", "to"),
+    region_pair = c("from_region", "to_region")
+  )
+)
+
+summary(m_site_region)
+```
+
+The important distinction is that these are **parallel dyadic terms**, not a
+nested dyadic syntax. Formula shorthand such as `(1 | site_pair / region_pair)`
+is not currently translated into a nested MLPE covariance structure, and
+dyadic terms with same-label endpoints are still rejected. If you need both
+site-level and region-level dyadic effects right now, write them as separate
+terms and ensure the retained rows satisfy that endpoint-label constraint.
+
 ```{r baseline-models, eval=FALSE}
 m_null <- mlpe(
   response ~ 1 + (1 | pair),

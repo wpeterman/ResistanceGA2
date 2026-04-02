@@ -1028,16 +1028,17 @@ SS_optim <- function(gdist.inputs = NULL,
         if (null_mod == TRUE) {
           dat <- gdist.inputs$df
           fit.null <- mlpe_rga(
-            formula = .mlpe_formula_from_data(
-              dat,
-              response = "gd",
-              predictor = "1",
+            formula = .rga_null_model_formula(
+              formula = gdist.inputs$formula,
+              data = dat,
               fallback = gd ~ 1 + (1 | pop)
             ),
             data = dat,
             ZZ = gdist.inputs$ZZ,
             REML = FALSE
           )
+
+          MLPE.list[['Null']] <- fit.null
 
           fit.stats <- r.squaredGLMM(fit.null)
           LL <- logLik(fit.null)
@@ -2058,16 +2059,17 @@ SS_optim <- function(gdist.inputs = NULL,
         if (null_mod == TRUE) {
           dat <- gdist.inputs$df
           fit.null <- mlpe_rga(
-            formula = .mlpe_formula_from_data(
-              dat,
-              response = "gd",
-              predictor = "1",
+            formula = .rga_null_model_formula(
+              formula = gdist.inputs$formula,
+              data = dat,
               fallback = gd ~ 1 + (1 | pop)
             ),
             data = dat,
             ZZ = gdist.inputs$ZZ,
             REML = FALSE
           )
+
+          MLPE.list[['Null']] <- fit.null
 
           fit.stats <- r.squaredGLMM(fit.null)
           LL <- logLik(fit.null)
@@ -2993,16 +2995,17 @@ SS_optim <- function(gdist.inputs = NULL,
         if (null_mod == TRUE) {
           dat <- jl.inputs$df
           fit.null <- mlpe_rga(
-            formula = .mlpe_formula_from_data(
-              dat,
-              response = "gd",
-              predictor = "1",
+            formula = .rga_null_model_formula(
+              formula = jl.inputs$formula,
+              data = dat,
               fallback = gd ~ 1 + (1 | pop)
             ),
             data = dat,
             ZZ = jl.inputs$ZZ,
             REML = FALSE
           )
+
+          MLPE.list[['Null']] <- fit.null
 
           fit.stats <- r.squaredGLMM(fit.null)
           LL <- logLik(fit.null)
@@ -3530,10 +3533,9 @@ SS_optim <- function(gdist.inputs = NULL,
           if (null_mod == TRUE) {
             dat <- jl.inputs$df
             fit.null <- mlpe_rga(
-              formula = .mlpe_formula_from_data(
-                dat,
-                response = "gd",
-                predictor = "1",
+              formula = .rga_null_model_formula(
+                formula = jl.inputs$formula,
+                data = dat,
                 fallback = gd ~ 1 + (1 | pop)
               ),
               data = dat,
@@ -3541,7 +3543,9 @@ SS_optim <- function(gdist.inputs = NULL,
               REML = FALSE
             )
 
-            fit.stats <- r.squaredGLMM(fit.null)
+            MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
             LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
@@ -4087,10 +4091,9 @@ SS_optim <- function(gdist.inputs = NULL,
           if (null_mod == TRUE) {
             dat <- jl.inputs$df
             fit.null <- mlpe_rga(
-              formula = .mlpe_formula_from_data(
-                dat,
-                response = "gd",
-                predictor = "1",
+              formula = .rga_null_model_formula(
+                formula = jl.inputs$formula,
+                data = dat,
                 fallback = gd ~ 1 + (1 | pop)
               ),
               data = dat,
@@ -4098,7 +4101,9 @@ SS_optim <- function(gdist.inputs = NULL,
               REML = FALSE
             )
 
-            fit.stats <- r.squaredGLMM(fit.null)
+            MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
             LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
@@ -4166,6 +4171,8 @@ SS_optim <- function(gdist.inputs = NULL,
   }
   
   
+  n.pops <- if (!is.null(gdist.inputs)) gdist.inputs$n.Pops else jl.inputs$n.Pops
+
   # Compile results into tables
   cat("\n")
   cat("\n")
@@ -4187,6 +4194,12 @@ SS_optim <- function(gdist.inputs = NULL,
         "LL",
         Features
       )
+    Results.cat <- .rga_update_result_table_models(
+      result_table = Results.cat,
+      fit_list = MLPE.list,
+      GA.inputs = GA.inputs,
+      n_pops = n.pops
+    )
     Results.cat <-  Results.cat[order(Results.cat$AICc), ]
     write.table(
       Results.cat,
@@ -4212,6 +4225,12 @@ SS_optim <- function(gdist.inputs = NULL,
         "shape",
         "max"
       )
+    Results.cont <- .rga_update_result_table_models(
+      result_table = Results.cont,
+      fit_list = MLPE.list,
+      GA.inputs = GA.inputs,
+      n_pops = n.pops
+    )
     Results.cont <- Results.cont[order(Results.cont$AICc), ]
     write.table(
       Results.cont,
@@ -4223,19 +4242,47 @@ SS_optim <- function(gdist.inputs = NULL,
   }
   
   # Full Results
+  summary.cols <- c(
+    "Surface",
+    "Fixed.Effects",
+    paste0("obj.func_", GA.inputs$method),
+    "k",
+    "AIC",
+    "AICc",
+    "R2m",
+    "R2c",
+    "LL"
+  )
+
   if (nrow(Results.cat) > 0 & nrow(Results.cont) > 0) {
-    Results.All <- rbind(Results.cat[, c(1:8)], Results.cont[, c(1:8)])
+    Results.All <- rbind(
+      Results.cat[, summary.cols, drop = FALSE],
+      Results.cont[, summary.cols, drop = FALSE]
+    )
   } else if (nrow(Results.cat) < 1 & nrow(Results.cont) > 0) {
-    Results.All <- (Results.cont[, c(1:8)])
+    Results.All <- Results.cont[, summary.cols, drop = FALSE]
   } else {
-    Results.All <- (Results.cat[, c(1:8)])
+    Results.All <- Results.cat[, summary.cols, drop = FALSE]
   }
   
-  if (dist_mod == TRUE)
+  if (dist_mod == TRUE) {
+    Dist.AICc$Fixed.Effects <- NA_character_
+    Dist.AICc <- Dist.AICc[, summary.cols, drop = FALSE]
     Results.All <- rbind(Results.All, Dist.AICc)
-  if (null_mod == TRUE)
+  }
+
+  if (null_mod == TRUE) {
+    Null.AICc$Fixed.Effects <- NA_character_
+    Null.AICc <- Null.AICc[, summary.cols, drop = FALSE]
     Results.All <- rbind(Results.All, Null.AICc)
+  }
   
+  Results.All <- .rga_update_result_table_models(
+    result_table = Results.All,
+    fit_list = MLPE.list,
+    GA.inputs = GA.inputs,
+    n_pops = n.pops
+  )
   Results.All <- Results.All[order(Results.All$AICc), ]
   
   cat("\n")
@@ -4276,8 +4323,8 @@ SS_optim <- function(gdist.inputs = NULL,
   } 
   # } ## End covariate if-else
   
-  k.list <- plyr::ldply(k.list)
-  colnames(k.list) <- c("surface", "k")
+  k.list <- Results.All[, c("Surface", "k", "Fixed.Effects"), drop = FALSE]
+  colnames(k.list) <- c("surface", "k", "fixed.effects")
   
   rt <- proc.time()[3] - t1
   # Full Results
@@ -4342,5 +4389,6 @@ SS_optim <- function(gdist.inputs = NULL,
   RESULTS <- resga_add_class(RESULTS, "resga_ss_optim")
   return(RESULTS)
 }
+
 
 

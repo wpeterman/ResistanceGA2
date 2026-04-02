@@ -74,6 +74,10 @@ resga_head_table <- function(x, n = 6L) {
   utils::head(x, n = max(1L, as.integer(n)))
 }
 
+resga_minutes <- function(seconds) {
+  as.numeric(seconds) / 60
+}
+
 resga_barplot <- function(values,
                           labels,
                           main,
@@ -287,7 +291,7 @@ print.summary.resga_ss_optim <- function(x, ...) {
   }
 
   if (!is.null(x$run_time) && length(x$run_time) == 1L && is.finite(x$run_time)) {
-    cat("  run time (sec):", signif(x$run_time, 6), "\n")
+    cat("  run time (min):", signif(resga_minutes(x$run_time), 6), "\n")
   }
 
   cat("\n")

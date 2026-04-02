@@ -328,6 +328,9 @@ test_that("SS_optim completes a minimal gdistance workflow", {
   ss_summary <- summary(ss_out)
   expect_s3_class(ss_summary, "summary.resga_ss_optim")
   expect_identical(ss_summary$best_surface, "continuous")
+  printed <- paste(capture.output(print(ss_summary)), collapse = "\n")
+  expect_match(printed, "run time \\(min\\):")
+  expect_false(grepl("run time \\(sec\\):", printed))
 
   expect_no_error(with_test_plot(plot(ss_out)))
 })
@@ -378,8 +381,22 @@ test_that("SS_optim covers covariate, distance, and null-model branches", {
   )
 
   expect_s3_class(ss_out$AICc, "data.frame")
+  expect_true("Fixed.Effects" %in% names(ss_out$AICc))
   expect_true(all(c("Distance", "Null") %in% ss_out$AICc$Surface))
   expect_true(all(c("categorical", "continuous") %in% ss_out$AICc$Surface))
+
+  null_terms <- ss_out$AICc$Fixed.Effects[ss_out$AICc$Surface == "Null"]
+  distance_terms <- ss_out$AICc$Fixed.Effects[ss_out$AICc$Surface == "Distance"]
+
+  expect_match(null_terms, "elev")
+  expect_false(grepl("\\bcd\\b", null_terms))
+  expect_match(distance_terms, "elev")
+  expect_match(distance_terms, "\\bcd\\b")
+
+  expect_equal(
+    ss_out$AICc$k[ss_out$AICc$Surface == "Null"],
+    length(lme4::fixef(ss_out$MLPE.list[["Null"]]))
+  )
 })
 
 test_that("MS_optim covers the covariate branch", {
@@ -396,8 +413,15 @@ test_that("MS_optim covers the covariate branch", {
   )
 
   expect_s3_class(ms_out$AICc.tab, "data.frame")
-  expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
+  expect_true(all(c("Fixed.Effects", "AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
   expect_true(nrow(ms_out$percent.contribution) >= 2L)
+  expect_match(ms_out$AICc.tab$Fixed.Effects[[1]], "elev")
+  expect_match(ms_out$AICc.tab$Fixed.Effects[[1]], "\\bcd\\b")
+  expect_equal(
+    ms_out$AICc.tab$k[[1]],
+    sum(inputs$ga$parm.type$n.parm) +
+      length(lme4::fixef(ms_out$MLPE.model)) - 1
+  )
 })
 
 test_that("Windows parallel SS_optim completes a minimal workflow", {
