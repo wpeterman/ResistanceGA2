@@ -34,9 +34,17 @@ Resistance.Opt_single.cov <-
     t1   <- Sys.time()
     iter <- iter %||% 1L
 
+    materialize_raster <- function(x) {
+      if (inherits(x, "PackedSpatRaster")) {
+        terra::unwrap(x)
+      } else {
+        x
+      }
+    }
+
     method       <- GA.inputs$method
     select.trans <- GA.inputs$select.trans
-    r            <- Resistance
+    r            <- materialize_raster(Resistance)
     keep         <- 1L
 
     # Categorical surface -------------------------------------------------------
@@ -97,7 +105,10 @@ Resistance.Opt_single.cov <-
         if (mean(terra::values(r), na.rm = TRUE) == 0) {
           obj.func.opt <- -99999
         } else {
-          cd <- try(Run_gdistance(gdist.inputs, r), silent = TRUE)
+          cd <- try(
+            Run_gdistance(gdist.inputs, r, return.error.value = TRUE),
+            silent = TRUE
+          )
 
           if (inherits(cd, "try-error") || identical(cd, -99999)) {
             obj.func.opt <- -99999

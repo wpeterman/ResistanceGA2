@@ -178,6 +178,21 @@ test_that("Run_gdistance converts SpatRaster internally for gdistance", {
   expect_equal(dim(out), c(4L, 4L))
 })
 
+test_that("Run_gdistance throws for invalid direct calls unless sentinel mode is requested", {
+  r <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+  terra::values(r) <- seq_len(terra::ncell(r))
+
+  expect_error(
+    Run_gdistance(gdist.inputs = list(), r = r),
+    "Run_gdistance failed"
+  )
+
+  expect_identical(
+    Run_gdistance(gdist.inputs = list(), r = r, return.error.value = TRUE),
+    -99999
+  )
+})
+
 test_that("all_comb auto-creates and uses the requested results directory", {
   surfaces <- make_surface_stack_regression()
 

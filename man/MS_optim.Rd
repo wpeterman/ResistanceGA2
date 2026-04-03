@@ -43,7 +43,7 @@ GA.inputs <- GA.prep(
 
 ms.out <- MS_optim(
   gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
+  GA.inputs = GA.worker.inputs,
   diagnostic_plots = FALSE
 )
 }

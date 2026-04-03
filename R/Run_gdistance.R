@@ -9,9 +9,15 @@
 #' @param scl Logical. Scale the correction values (default \code{TRUE}). Set
 #'   to \code{FALSE} to obtain absolute distance values. See
 #'   \code{\link[gdistance]{geoCorrection}} for details.
+#' @param return.error.value Logical. If \code{TRUE}, return \code{-99999} on
+#'   warnings/errors instead of throwing an error. This is intended for
+#'   internal GA fitness evaluation, where failed candidate surfaces should be
+#'   penalized but optimization should continue. Default is \code{FALSE} for
+#'   user-facing calls.
 #'
 #' @return A numeric distance vector (or matrix) of pairwise cost/commute
-#'   distances. Returns \code{-99999} on error or warning.
+#'   distances. If \code{return.error.value = TRUE}, returns \code{-99999} on
+#'   error or warning.
 #'
 #' @details
 #' \pkg{gdistance} still operates on \pkg{raster} objects. This function keeps
@@ -33,7 +39,8 @@
 #' length(cd)
 Run_gdistance <- function(gdist.inputs,
                           r,
-                          scl = TRUE) {
+                          scl = TRUE,
+                          return.error.value = FALSE) {
   out <- tryCatch(
     {
       r_gd <- .gdistance_raster(r, arg = "r")
@@ -93,5 +100,8 @@ Run_gdistance <- function(gdist.inputs,
       return(-99999)
     }
   )
-  return(out)
+  if (identical(out, -99999) && !isTRUE(return.error.value)) {
+    stop("Run_gdistance failed for the supplied `gdist.inputs` and resistance surface.")
+  }
+  out
 }

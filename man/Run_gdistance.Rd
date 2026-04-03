@@ -4,7 +4,7 @@
 \alias{Run_gdistance}
 \title{Run gdistance cost/commute distance calculation}
 \usage{
-Run_gdistance(gdist.inputs, r, scl = TRUE)
+Run_gdistance(gdist.inputs, r, scl = TRUE, return.error.value = FALSE)
 }
 \arguments{
 \item{gdist.inputs}{Object created by \code{\link[ResistanceGA2]{gdist.prep}}.}
@@ -15,10 +15,17 @@ package).}
 \item{scl}{Logical. Scale the correction values (default \code{TRUE}). Set
 to \code{FALSE} to obtain absolute distance values. See
 \code{\link[gdistance]{geoCorrection}} for details.}
+
+\item{return.error.value}{Logical. If \code{TRUE}, return \code{-99999} on
+warnings/errors instead of throwing an error. This is intended for
+internal GA fitness evaluation, where failed candidate surfaces should be
+penalized but optimization should continue. Default is \code{FALSE} for
+user-facing calls.}
 }
 \value{
 A numeric distance vector (or matrix) of pairwise cost/commute
-  distances. Returns \code{-99999} on error or warning.
+  distances. If \code{return.error.value = TRUE}, returns \code{-99999} on
+  error or warning.
 }
 \description{
 Calculates pairwise cost or commute distances across a resistance surface

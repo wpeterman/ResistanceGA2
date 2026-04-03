@@ -31,7 +31,7 @@ library(terra)
 
 # What Is ResistanceGA2?
 
-Landscape genetics asks how the physical environment shapes the movement of individuals — and, by extension, how genes flow across the landscape. Two populations might be far apart in straight-line geographic distance, but if a highway, a mountain range, or a patch of inhospitable habitat lies between them, their genetic exchange may be far lower than geography alone would predict.
+Landscape genetics asks how the physical environment shapes the movement of individuals; and by extension, how genes flow across the landscape. Two populations might be far apart in straight-line geographic distance, but if a highway, a mountain range, or a patch of inhospitable habitat lies between them, their genetic exchange may be far lower than geography alone would predict.
 
 `ResistanceGA2` is an R package for *optimizing* the resistance values assigned to those landscape features. Rather than deciding in advance that "forest = low resistance, pavement = high resistance," the package uses a **genetic algorithm** to search the space of possible parameter values and find the resistance surface that best explains the observed pattern of genetic differentiation among sampled populations.
 
@@ -41,11 +41,11 @@ Three hypotheses are commonly evaluated in landscape genetics:
 
 **Isolation by Distance (IBD):** Genetic differentiation increases with geographic distance because dispersal is limited. This is the null expectation under random dispersal across a homogeneous landscape.
 
-**Isolation by Resistance (IBR):** Genetic differentiation is better explained by *effective* distance — the cost of moving through a heterogeneous landscape — than by straight-line distance. Different habitat types impede movement to different degrees, so a resistance surface is parameterized and optimized.
+**Isolation by Resistance (IBR):** Genetic differentiation is better explained by *effective* distance (the cost of moving through a heterogeneous landscape) than by straight-line distance. Different habitat types impede movement to different degrees, so a resistance surface is parameterized and optimized.
 
 **Isolation by Environment (IBE):** Genetic differentiation reflects differences in local environmental conditions (temperature, elevation, soil type) that reduce the probability of successful migration between ecologically dissimilar sites, even if those sites are geographically close.
 
-These three hypotheses are not mutually exclusive. In many systems, genetic structure reflects a combination of all three. `ResistanceGA2` supports workflows that test these hypotheses individually and in combination — including the `mlpe_rga()` formula interface that lets you include environmental covariates alongside resistance distances in a single MLPE model. See the `IBE_IBR_Workflow` vignette for a full worked example of concurrent IBD/IBE/IBR testing.
+These three hypotheses are not mutually exclusive. In many systems, genetic structure reflects a combination of all three. `ResistanceGA2` supports workflows that test these hypotheses individually and in combination, including the `mlpe_rga()` formula interface that lets you include environmental covariates alongside resistance distances in a single MLPE model. See the `IBE_IBR_Workflow` vignette for a full worked example of concurrent IBD/IBE/IBR testing.
 
 ## The Conceptual Workflow
 
@@ -77,7 +77,7 @@ These three hypotheses are not mutually exclusive. In many systems, genetic stru
   +----------------------------------------------+
   |  Genetic Algorithm                            |
   |  searches transformation parameter space      |
-  |  maximises LL / minimises AIC                 |
+  |  maximizes LL / minimizes AIC                 |
   +----------------------------------------------+
          |
          v
@@ -103,7 +103,7 @@ If Pandoc is not available on your machine, install without vignettes first and 
 devtools::install_github("wpeterman/ResistanceGA2", build_vignettes = FALSE)
 ```
 
-The core dependencies are `terra`, `gdistance`, `lme4`, `GA`, and `ggplot2`. For Julia/Circuitscape support, you also need `JuliaConnectoR` and a working Julia installation — see the `Julia_Guide` vignette for setup instructions.
+The core dependencies are `terra`, `gdistance`, `lme4`, `GA`, and `ggplot2`. For Julia/Circuitscape support, you also need `JuliaConnectoR` and a working Julia installation; see the `Julia_Guide` vignette for setup instructions.
 
 ---
 
@@ -119,9 +119,9 @@ resistance_surfaces
 
 `resistance_surfaces` is a three-layer `SpatRaster`:
 
-- **`categorical`** — a categorically coded surface with class values representing distinct habitat types (e.g., land cover classes). The GA assigns a separate resistance value to each class.
-- **`continuous`** — a continuously varying surface (e.g., canopy cover, elevation). The GA fits a parameterized transformation curve mapping raw values to resistance values.
-- **`feature`** — a binary or near-binary surface representing a linear landscape feature (e.g., a road or river).
+- **`categorical`**: a categorically coded surface with class values representing distinct habitat types (e.g., land cover classes). The GA assigns a separate resistance value to each class.
+- **`continuous`**: a continuously varying surface (e.g., canopy cover, elevation). The GA fits a parameterized transformation curve mapping raw values to resistance values.
+- **`feature`**: a binary or near-binary surface representing a linear landscape feature (e.g., a road or river).
 
 ```{r plot-surfaces, fig.cap="The three bundled resistance surface layers. Categorical (left) has discrete class values. Continuous (center) varies smoothly. Feature (right) represents a linear landscape element."}
 plot(resistance_surfaces, main = c("Categorical", "Continuous", "Feature"))
@@ -153,7 +153,7 @@ points(pts_small, pch = 1,  col = "black", cex = 0.9)
 raster_orig
 ```
 
-`raster_orig` contains the `cont_orig` layer — a continuous surface intended for use with the larger `sample_pops` dataset in full optimization demonstrations. Use this layer when you want to run `SS_optim()` or `MS_optim()` with the larger sample sets.
+`raster_orig` contains the `cont_orig` layer, a continuous surface intended for use with the larger `sample_pops` dataset in full optimization demonstrations. Use this layer when you want to run `SS_optim()` or `MS_optim()` with the larger sample sets.
 
 ## Precomputed Pairwise Outputs
 
@@ -391,7 +391,7 @@ vignette("Julia_Guide",          package = "ResistanceGA2")
 
 **Save your Results.dir outputs.** The functions write tables and plots to `Results.dir`. These are useful for comparing runs and documenting the optimization trajectory.
 
-> **Warning:** Do not interpret optimization as hypothesis testing. Finding that a particular resistance surface has the lowest AICc does not mean the alternative surfaces are false — it means the data, as analyzed, are more consistent with that parameterization. Replication, cross-validation, and biological interpretation are essential complements to the optimization output.
+> **Warning:** Do not interpret optimization as hypothesis testing. Finding that a particular resistance surface has the lowest AICc does not mean the alternative surfaces are false. It means the data, as analyzed, are more consistent with that parameterization. Replication, cross-validation, and biological interpretation are essential complements to the optimization output.
 
 ---
 

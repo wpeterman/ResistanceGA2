@@ -61,7 +61,7 @@ GA.inputs <- GA.prep(
 
 ss.out <- SS_optim(
   gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
+  GA.inputs = GA.worker.inputs,
   dist_mod = FALSE,
   null_mod = FALSE,
   diagnostic_plots = FALSE

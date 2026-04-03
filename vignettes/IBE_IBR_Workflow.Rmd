@@ -40,13 +40,13 @@ A foundational goal of landscape genetics is to understand *why* geographically 
 
 **Isolation by Distance (IBD):** Even on a featureless landscape, dispersal is limited in space. As geographic distance between populations increases, the probability of successful migration decreases, and genetic differentiation accumulates. IBD is the simplest null expectation and should always be evaluated before attributing genetic structure to landscape features.
 
-**Isolation by Resistance (IBR):** The landscape is not featureless. Different habitat types, land covers, and linear features impede or facilitate movement to varying degrees. The effective distance — the accumulated movement cost across a heterogeneous landscape — predicts genetic differentiation better than straight-line geographic distance. This is the core hypothesis tested by resistance surface optimization in `ResistanceGA2`.
+**Isolation by Resistance (IBR):** The landscape is not featureless. Different habitat types, land covers, and linear features impede or facilitate movement to varying degrees. The effective distance (the accumulated movement cost across a heterogeneous landscape) predicts genetic differentiation better than straight-line geographic distance. This is the core hypothesis tested by resistance surface optimization in `ResistanceGA2`.
 
-**Isolation by Environment (IBE):** Populations in dissimilar environments may exchange fewer genes even when geographically close, because migrants face low fitness in the destination environment (ecological selection against migrants, also called "environment-dependent migration"). IBE is quantified by differences in environmental variables between population pairs — not the cost of the landscape path between them, but the dissimilarity of local conditions at the endpoints.
+**Isolation by Environment (IBE):** Populations in dissimilar environments may exchange fewer genes even when geographically close, because migrants face low fitness in the destination environment (ecological selection against migrants, also called "environment-dependent migration"). IBE is quantified by differences in environmental variables between population pairs: not the cost of the landscape path between them, but the dissimilarity of local conditions at the endpoints.
 
 ## Why Concurrent Testing Matters
 
-These three processes are not mutually exclusive. In many empirical systems, pairwise genetic distances reflect some combination of all three. If you test IBR without accounting for IBD or IBE, you may attribute to landscape resistance some genetic structure that actually arises from geographic distance or environmental dissimilarity — and vice versa.
+These three processes are not mutually exclusive. In many empirical systems, pairwise genetic distances reflect some combination of all three. If you test IBR without accounting for IBD or IBE, you may attribute to landscape resistance some genetic structure that actually arises from geographic distance or environmental dissimilarity, and vice versa.
 
 Concurrent testing addresses this by including IBD (geographic distance), IBE (environmental dissimilarity), and IBR (resistance distance) as simultaneous predictors in a single MLPE model. The `mlpe_rga()` function in `ResistanceGA2` provides a flexible formula interface for this purpose.
 
@@ -76,8 +76,8 @@ The demo involves:
 - **Two continuous resistance surfaces**: `err27` and `ffp` (environmental rasters representing different landscape variables)
 - **Three covariates** for IBD/IBE modeling:
   - `geo`: pairwise geographic distance (for IBD)
-  - `cti_diff`: pairwise difference in Compound Topographic Index (CTI) — an IBE covariate
-  - `hli_diff`: pairwise difference in Heat Load Index (HLI) — an IBE covariate
+  - `cti_diff`: pairwise difference in Compound Topographic Index (CTI), an IBE covariate
+  - `hli_diff`: pairwise difference in Heat Load Index (HLI), an IBE covariate
 
 The objective is to determine whether landscape resistance (IBR) contributes to genetic structure beyond the effects of geographic distance (IBD) and environmental dissimilarity (IBE).
 

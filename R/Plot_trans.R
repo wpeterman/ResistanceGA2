@@ -165,36 +165,34 @@ Plot.trans <- function(PARM,
     x.break <- pretty(original * 1.07)
     y.break <- pretty(transformed * 1.07)
     
-    (
-      p <- ggplot(plot.data, aes(x = original, y = transformed)) +
-        # ggtitle(equation) +
-        theme_bw() +
-        geom_line(linewidth = 1.5) +
-        xlab(expression(bold(
-          "Original data values"
-        ))) +
-        ylab(expression(bold(
-          "Transformed data values"
-        ))) +
-        theme(
-          # plot.title = element_text(
-          #   lineheight = 2,
-          #   face = "bold",
-          #   size = 20
-          # ),
-          legend.title = element_blank(),
-          legend.key = element_blank(),
-          axis.text.x = element_text(size = 14),
-          axis.text.y = element_text(size = 14),
-          axis.title.x = element_text(size = 16),
-          axis.title.y = element_text(size = 16)
-        ) +
-        scale_x_continuous(limits = c(min(original), max(original)), breaks =
-                             x.break) +
-        scale_y_continuous(limits = c(min(transformed), max(transformed)), breaks =
-                             y.break) +
-        removeGrid()
-    )
+    p <- ggplot(plot.data, aes(x = original, y = transformed)) +
+      # ggtitle(equation) +
+      theme_bw() +
+      geom_line(linewidth = 1.5) +
+      xlab(expression(bold(
+        "Original data values"
+      ))) +
+      ylab(expression(bold(
+        "Transformed data values"
+      ))) +
+      theme(
+        # plot.title = element_text(
+        #   lineheight = 2,
+        #   face = "bold",
+        #   size = 20
+        # ),
+        legend.title = element_blank(),
+        legend.key = element_blank(),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16)
+      ) +
+      scale_x_continuous(limits = c(min(original), max(original)), breaks =
+                           x.break) +
+      scale_y_continuous(limits = c(min(transformed), max(transformed)), breaks =
+                           y.break) +
+      removeGrid()
     
     # * Marginal plots --------------------------------------------------------
     
@@ -326,10 +324,10 @@ Plot.trans <- function(PARM,
       removeGrid()
     
     # Add marginal plot
-    (p <- ggMarginal(p, 
-                     type = marg.type,
-                     size = 8
-    ))
+    p <- ggMarginal(p,
+                    type = marg.type,
+                    size = 8
+    )
     
     
   } # End response plot
@@ -345,10 +343,10 @@ Plot.trans <- function(PARM,
     )
     print(p)
     dev.off()
-    return(p)
+    return(invisible(p))
   }
   print(p)
-  return(p)
+  invisible(p)
   
 }
 

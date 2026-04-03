@@ -36,7 +36,7 @@ library(ggplot2)
 
 ## Resistance Modeling in Landscape Genetics
 
-The central question in landscape genetics is deceptively simple: why do some pairs of populations exchange genes more readily than others? Geography matters — nearby populations tend to be more similar — but geography is rarely the whole story. The landscape between populations shapes movement, and movement shapes gene flow. A river, a road, a ridge line, or simply an expanse of unsuitable habitat can reduce effective connectivity far below what geographic distance alone would predict.
+The central question in landscape genetics is deceptively simple: why do some pairs of populations exchange genes more readily than others? Geography matters (nearby populations tend to be more similar) but geography is rarely the whole story. The landscape between populations shapes movement, and movement shapes gene flow. A river, a road, a ridge line, or simply an expanse of unsuitable habitat can reduce effective connectivity far below what geographic distance alone would predict.
 
 Quantifying that connectivity requires a *resistance surface*: a raster in which each cell value represents the cost of moving through that location. Low resistance values allow easy passage; high resistance values impede movement. By accumulating resistance across paths between locations, we obtain pairwise *effective distances* that can be compared against observed genetic differentiation.
 
@@ -49,14 +49,14 @@ The genetic algorithm (GA) is a metaheuristic that mimics natural selection over
 1. Every candidate parameter set is used to transform the input raster into a resistance surface.
 2. Pairwise effective distances are computed from that surface (via `gdistance` or Julia/Circuitscape).
 3. An MLPE model is fit with those distances as the predictor of pairwise genetic distance.
-4. The objective function — by default, log-likelihood — is returned as the "fitness" of that candidate.
+4. The objective function (by default, log-likelihood) is returned as the "fitness" of that candidate.
 5. High-fitness candidates are selected, recombined, and mutated to form the next generation.
 
-This process repeats until the population converges or a stopping criterion is met (maximum iterations, or a run of generations with no improvement). The result is the parameter set — transformation shape, maximum resistance, and/or class-specific values — that maximizes the explanatory power of the resistance surface for the genetic data at hand.
+This process repeats until the population converges or a stopping criterion is met (maximum iterations, or a run of generations with no improvement). The result is the parameter set (transformation shape, maximum resistance, and/or class-specific values) that maximizes the explanatory power of the resistance surface for the genetic data at hand.
 
 ## The MLPE Framework
 
-Standard regression models cannot be applied directly to pairwise genetic and landscape distance data because observations sharing a common sampling location are not independent — any pair involving population A is correlated with any other pair involving population A. The MLPE model (Clarke et al. 2002) handles this by including a random effect structured to absorb that dependency:
+Standard regression models cannot be applied directly to pairwise genetic and landscape distance data because observations sharing a common sampling location are not independent (any pair involving population A is correlated with any other pair involving population A). The MLPE model (Clarke et al. 2002) handles this by including a random effect structured to absorb that dependency:
 
 ```
 genetic_distance ~ resistance_distance + (1 | pop)
@@ -75,7 +75,7 @@ Before launching a GA search, it is worth thinking carefully about the choices t
 Three objective functions are available via `GA.prep(method = ...)`:
 
 - **`"LL"` (default):** Maximize the log-likelihood of the MLPE model. This is the recommended starting point. LL is a direct measure of model fit and provides a clean, sensitive objective surface for the GA.
-- **`"AIC"`:** Minimize AIC. Penalizes model complexity, but the penalty depends on `k.value` — see below.
+- **`"AIC"`:** Minimize AIC. Penalizes model complexity, but the penalty depends on `k.value` (see below).
 - **`"R2"`:** Maximize marginal R^2^ of the MLPE model. Intuitive, but simulation studies have shown R^2^ to be a less sensitive and less reliable guide for the GA than LL (Beninde et al. 2024). This option is retained for backward compatibility but is not recommended as a primary search objective.
 
 Regardless of which objective drives the GA, the output always includes AIC, AICc, R^2^~m~, R^2^~c~, and LL for all fitted models so that you can compare results on multiple criteria after the search.
