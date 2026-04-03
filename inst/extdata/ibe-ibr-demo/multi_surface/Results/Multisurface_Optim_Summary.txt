@@ -1,0 +1,93 @@
+Summary from multisurface optimization run conducted on 2026-04-02 
+ --- GA package summary output ---  
+
+
+── Genetic Algorithm ─────────────────── 
+
+GA settings: 
+Type                  =  real-valued 
+Population size       =  10 
+Number of generations =  2 
+Elitism               =  1 
+Crossover probability =  0.85 
+Mutation probability  =  0.125 
+Search domain = 
+        x1   x2    x3   x4   x5    x6
+lower 1.00  0.5 1e-03 1.00  0.5 1e-03
+upper 9.99 14.5 1e+03 9.99 14.5 1e+03
+Suggestions = 
+   x1       x2        x3 x4       x5         x6
+1   9 6.981149  21.31709  3 7.183061   2.587939
+2   7 5.782830 344.34671  5 4.481583 737.460093
+3   1 7.425194 326.11930  5 8.518984 469.582176
+4   7 6.230086 392.46594  9 4.519333 520.504119
+5   9 6.496533 261.91191  1 8.897070  26.515374
+6   3 6.052751 361.64188  1 6.808378 658.473407
+7   9 3.897124 878.74349  1 4.088726 540.731594
+8   1 6.269096 401.53052  7 8.465145  81.163704
+9   7 2.568917 405.82243  9 8.774974 348.444653
+10  1 4.675457 226.22129  3 8.079374 422.637691
+
+GA results: 
+Iterations             = 1 
+Fitness function value = 98.3008 
+Solution = 
+     x1       x2       x3 x4       x5       x6
+[1,]  7 6.230086 392.4659  9 4.519333 520.5041
+
+ --- ResistanceGA2 summary output --- 
+
+Optimized using: costDistance 
+
+Objective function: LL 
+
+Surfaces included in optimization: 
+err27 ffp 
+
+k =  10 
+
+Minimum AIC: -176.601593162591 
+
+AICc: 43.3984068374092 
+
+Pseudo marginal R-square (R2m): 0.693412440761878 
+Pseudo conditional R-square (R2c): 0.748979141230855 
+
+Log Likelihood: 98.3007965812954 
+
+Optimized values for each surface: 
+7 6.230086 392.4659 9 4.519333 520.5041 
+
+
+----- Final MLPE model fit using REML ----- 
+Linear mixed model fit by REML ['lmerMod']
+
+REML criterion at convergence: -162.6
+
+Scaled residuals: 
+     Min       1Q   Median       3Q      Max 
+-2.41537 -0.60938 -0.08596  0.76928  1.75571 
+
+Random effects:
+ Groups   Name        Variance  Std.Dev.
+ pop      (Intercept) 0.0007716 0.02778 
+ Residual             0.0024735 0.04973 
+Number of obs: 66, groups:  pop, 12
+
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)  0.3875159  0.0232699  16.653
+geo         -0.1165464  0.0440794  -2.644
+cti_diff     0.0001726  0.0092237   0.019
+hli_diff     0.0009039  0.0096757   0.093
+cd           0.1910451  0.0436768   4.374
+
+Correlation of Fixed Effects:
+         (Intr) geo    ct_dff hl_dff
+geo       0.102                     
+cti_diff -0.513 -0.053              
+hli_diff -0.498 -0.177  0.123       
+cd       -0.117 -0.984  0.075  0.186
+
+
+Optimization took 3.40817 minutes to complete 
