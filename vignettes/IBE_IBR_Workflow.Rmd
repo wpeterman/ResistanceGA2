@@ -1,0 +1,510 @@
+---
+title: "Concurrent IBD, IBE, and IBR Analysis"
+author: "Bill Peterman"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: false
+vignette: |
+  %\VignetteIndexEntry{Concurrent IBD, IBE, and IBR Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  message   = FALSE,
+  warning   = FALSE
+)
+```
+
+```{r libraries}
+library(ResistanceGA2)
+library(terra)
+library(lme4)
+```
+
+---
+
+# Conceptual Background
+
+## Three Hypotheses for Spatial Genetic Structure
+
+A foundational goal of landscape genetics is to understand *why* geographically separated populations differ genetically. Three broad classes of explanation are typically considered:
+
+**Isolation by Distance (IBD):** Even on a featureless landscape, dispersal is limited in space. As geographic distance between populations increases, the probability of successful migration decreases, and genetic differentiation accumulates. IBD is the simplest null expectation and should always be evaluated before attributing genetic structure to landscape features.
+
+**Isolation by Resistance (IBR):** The landscape is not featureless. Different habitat types, land covers, and linear features impede or facilitate movement to varying degrees. The effective distance — the accumulated movement cost across a heterogeneous landscape — predicts genetic differentiation better than straight-line geographic distance. This is the core hypothesis tested by resistance surface optimization in `ResistanceGA2`.
+
+**Isolation by Environment (IBE):** Populations in dissimilar environments may exchange fewer genes even when geographically close, because migrants face low fitness in the destination environment (ecological selection against migrants, also called "environment-dependent migration"). IBE is quantified by differences in environmental variables between population pairs — not the cost of the landscape path between them, but the dissimilarity of local conditions at the endpoints.
+
+## Why Concurrent Testing Matters
+
+These three processes are not mutually exclusive. In many empirical systems, pairwise genetic distances reflect some combination of all three. If you test IBR without accounting for IBD or IBE, you may attribute to landscape resistance some genetic structure that actually arises from geographic distance or environmental dissimilarity — and vice versa.
+
+Concurrent testing addresses this by including IBD (geographic distance), IBE (environmental dissimilarity), and IBR (resistance distance) as simultaneous predictors in a single MLPE model. The `mlpe_rga()` function in `ResistanceGA2` provides a flexible formula interface for this purpose.
+
+The general logic of the concurrent workflow is:
+
+```
+Step 1: Fit baseline models (null, IBD, IBE, IBD+IBE)
+Step 2: Add resistance surface to best baseline model
+Step 3: Compare: does IBR improve beyond IBD + IBE?
+Step 4: Multi-surface: does a composite surface improve further?
+```
+
+This stepwise approach partitions the explained variance and clarifies whether landscape resistance provides unique explanatory power beyond simpler geographic and environmental predictors.
+
+---
+
+# The ibe-ibr-demo Dataset
+
+This vignette uses a pre-analyzed demonstration dataset that ships with `ResistanceGA2`. The analysis has already been run; we load the precomputed results and walk through the interpretation.
+
+## Dataset Overview
+
+The demo involves:
+
+- **12 populations** sampled across a landscape (66 pairwise observations)
+- **Genetic distances**: pairwise genetic differentiation among the 12 populations
+- **Two continuous resistance surfaces**: `err27` and `ffp` (environmental rasters representing different landscape variables)
+- **Three covariates** for IBD/IBE modeling:
+  - `geo`: pairwise geographic distance (for IBD)
+  - `cti_diff`: pairwise difference in Compound Topographic Index (CTI) — an IBE covariate
+  - `hli_diff`: pairwise difference in Heat Load Index (HLI) — an IBE covariate
+
+The objective is to determine whether landscape resistance (IBR) contributes to genetic structure beyond the effects of geographic distance (IBD) and environmental dissimilarity (IBE).
+
+## Loading the Demo Data
+
+```{r load-demo-data}
+# Load precomputed pair-level data
+pair_rds <- system.file(
+  "extdata/ibe-ibr-demo/pair_data.rds",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(pair_rds)) {
+  pair_data <- readRDS(pair_rds)
+} else {
+  stop("Demo data not found. Please reinstall ResistanceGA2.")
+}
+
+# Inspect the pairwise data frame
+head(pair_data)
+dim(pair_data)
+names(pair_data)
+```
+
+The `pair_data` data frame has one row per population pair (66 rows for 12 populations). Each row contains:
+- Pairwise genetic distance (`gd` or similar column)
+- Pairwise geographic distance (`geo`)
+- Pairwise environmental differences (`cti_diff`, `hli_diff`)
+- Population grouping variable (`pop1`) from `To.From.ID()`
+- Pairwise resistance distances from each surface (`err27_cd`, `ffp_cd`)
+
+---
+
+# Setting Up the MLPE Workflow
+
+## The To.From.ID() Function
+
+Every MLPE model requires a population grouping vector that describes which sampling locations contribute to each pairwise observation. This is created by `To.From.ID()`:
+
+```{r to-from-id}
+# For 12 populations: 12*(12-1)/2 = 66 pairwise observations
+id <- To.From.ID(12)
+head(id)
+nrow(id)
+```
+
+The `pop1` column from `To.From.ID()` is the random effect variable used in all MLPE models. It ensures that all pairs sharing a common sampling location are properly correlated in the mixed model.
+
+> **Important:** The random effect in `mlpe_rga()` must always be `(1 | pop)` where `pop` is the `pop1` column from `To.From.ID()`. This is a structural requirement of the MLPE framework — it cannot be substituted with a different grouping variable.
+
+## The mlpe_rga() Function
+
+`mlpe_rga()` uses a standard `lme4` formula interface. The formula specifies the response (genetic distance), fixed-effect predictors (IBD, IBE, IBR covariates), and the MLPE random effect:
+
+```{r mlpe-syntax, eval=FALSE}
+# Basic syntax
+mod <- mlpe_rga(
+  formula = genetic_dist ~ predictor1 + predictor2 + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE   # use ML for AIC-based comparisons
+)
+```
+
+The `ZZ` matrix for the MLPE random effect is constructed automatically from the number of rows in `data`. You do not need to create it manually.
+
+---
+
+# Fitting Baseline Models
+
+The baseline models establish what geographic distance and environmental dissimilarity alone can explain, before adding any resistance surface. All baseline models are fit with `REML = FALSE` to allow AIC-based comparison.
+
+## Model Set
+
+We fit four baseline models:
+
+1. **Null:** Only the intercept and random effect — no geographic or environmental predictors.
+2. **IBD:** Geographic distance alone.
+3. **IBE:** Environmental dissimilarity alone (CTI + HLI differences).
+4. **IBD + IBE:** Geographic distance and environmental dissimilarity combined.
+
+```{r fit-baselines, eval=FALSE}
+# Null model: no fixed predictors
+mod_null <- mlpe_rga(
+  formula = gd ~ 1 + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+# IBD: geographic distance only
+mod_ibd <- mlpe_rga(
+  formula = gd ~ geo + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+# IBE: environmental dissimilarity only
+mod_ibe <- mlpe_rga(
+  formula = gd ~ cti_diff + hli_diff + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+# IBD + IBE combined baseline
+mod_ibd_ibe <- mlpe_rga(
+  formula = gd ~ geo + cti_diff + hli_diff + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+```
+
+## Loading and Displaying Baseline Results
+
+```{r load-baselines}
+baseline_rds <- system.file(
+  "extdata/ibe-ibr-demo/baseline_models.rds",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(baseline_rds)) {
+  baseline_models <- readRDS(baseline_rds)
+} else {
+  message("Baseline model results not found.")
+  baseline_models <- NULL
+}
+
+# Load the precomputed baseline comparison table
+baseline_table_file <- system.file(
+  "extdata/ibe-ibr-demo/baseline_model_table.csv",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(baseline_table_file)) {
+  baseline_table <- read.csv(baseline_table_file)
+} else {
+  baseline_table <- NULL
+}
+```
+
+```{r display-baseline-table, eval=!is.null(baseline_table)}
+knitr::kable(
+  baseline_table[order(baseline_table$AIC), ],
+  digits  = 3,
+  caption = "Baseline model comparison. Models ranked by AIC. deltaAIC = difference from best model. weight = AIC weight.",
+  row.names = FALSE
+)
+```
+
+## Interpreting the Baseline Table
+
+The baseline table reveals the relative support for IBD and IBE as drivers of genetic structure *before* adding any resistance surface.
+
+In the demo dataset:
+- The **IBD model** (`ibd`) has the lowest AIC, indicating that geographic distance is the dominant baseline predictor.
+- The **IBD + IBE model** (`ibd_ibe`) has slightly worse AIC, suggesting the environmental covariates do not substantially improve on geographic distance alone at the baseline level.
+- The **null model** has the highest AIC by a wide margin, confirming that spatial structuring is present.
+
+This baseline tells us: geographic distance explains the majority of genetic structure in this system. Any resistance surface we add must beat this baseline to demonstrate that landscape heterogeneity provides unique explanatory power.
+
+## Baseline Fixed Effects
+
+The coefficient estimates from the baseline models give ecological insights even before resistance surfaces are considered:
+
+```{r load-fixed-effects}
+fe_file <- system.file(
+  "extdata/ibe-ibr-demo/baseline_fixed_effects.csv",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(fe_file)) {
+  fixed_effects <- read.csv(fe_file)
+  knitr::kable(
+    fixed_effects,
+    digits  = 4,
+    caption = "Fixed effect estimates from baseline MLPE models."
+  )
+}
+```
+
+Key observations from the fixed effects:
+
+- **`geo` coefficient** (IBD model): Positive and substantial, confirming that genetic differentiation increases with geographic distance.
+- **`cti_diff` and `hli_diff` coefficients** (IBE models): Both negative, meaning that pairs with more dissimilar CTI or HLI values tend to have *lower* genetic distance — an unexpected direction that may reflect sampling design or the scale of environmental variation relative to dispersal.
+- **Combined model:** When both geographic and environmental distances are included, the environmental coefficients shrink substantially, suggesting multicollinearity between geographic and environmental dissimilarity in this landscape.
+
+---
+
+# Adding Resistance Surfaces
+
+## Single-Surface Results with Covariates
+
+The single-surface optimization in the demo fits each resistance surface *simultaneously with the IBD/IBE covariates*. The fixed effects in the MLPE model include `geo + cti_diff + hli_diff + cd`, where `cd` is the optimized resistance distance.
+
+```{r load-ss-results}
+ss_table_file <- system.file(
+  "extdata/ibe-ibr-demo/single_surface_aicc.csv",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(ss_table_file)) {
+  ss_table <- read.csv(ss_table_file)
+}
+```
+
+```{r display-ss-table, eval=exists("ss_table")}
+knitr::kable(
+  ss_table,
+  digits  = 3,
+  caption = "Single-surface optimization results with IBD/IBE covariates. Models include geo + cti_diff + hli_diff as fixed covariates alongside the optimized resistance distance (cd).",
+  row.names = FALSE
+)
+```
+
+## Interpreting Single-Surface Results with Covariates
+
+The single-surface table compares four models: the covariate-only baseline ("Null" = geo + cti_diff + hli_diff, no resistance surface), a flat distance model, and the two optimized surfaces. Reading this table requires care because AIC and AICc can give different conclusions, especially with small sample sizes.
+
+**Log-likelihood and AIC** favor both resistance surfaces over the covariate-only baseline. The `ffp` surface improves AIC by ~16 units over the baseline, and `err27` by ~12 units — both substantial improvements in raw model fit.
+
+**AICc** tells a different story. With only 12 populations (n = 12) and k = 7 parameters for a continuous surface with covariates (intercept + geo + cti_diff + hli_diff + cd + variance components), the AICc penalty is severe: each additional parameter costs roughly 7 AICc units instead of the 2 units AIC charges. As a result, the AICc for `ffp` (−159.2) is actually *higher* (worse) than the covariate-only baseline AICc (−165.6), even though `ffp` has a substantially higher log-likelihood.
+
+This highlights a key tension in landscape genetics:
+
+- **AIC** is more permissive: it rewards improved fit and does not heavily penalize complexity when n is small.
+- **AICc** is more conservative: with few populations, it penalizes additional parameters aggressively, sometimes "punishing" a surface that genuinely explains connectivity better than the baseline.
+
+The `R2m` column (marginal R^2^) provides a useful complement to AICc. For `ffp`, R^2^~m~ ≈ 0.70, meaning the full model including covariates and the `ffp` surface explains approximately 70% of pairwise genetic variance. The covariate-only baseline explains about 60% (R^2^~m~ for Null ≈ 0.60). The 10-percentage-point gain reflects real explanatory power, even if AICc does not reward it given the sample size.
+
+> **Key takeaway:** In small-population datasets, log-likelihood and AIC often provide more useful guidance than AICc for evaluating resistance surfaces. The choice of information criterion — and how you count `k` — matters enormously and should be reported and justified in any publication. See the `ResistanceGA` vignette for a detailed discussion of `k.value` options.
+
+Both surfaces also outperform the "Distance" model (flat, uniform resistance), confirming that landscape heterogeneity — not merely the geographic separation between sites — shapes the pattern of genetic differentiation.
+
+---
+
+# Multi-Surface Resistance Analysis
+
+After evaluating surfaces individually, the next step is to test whether combining them improves fit further.
+
+## Loading Multi-Surface Results
+
+```{r load-ms-results}
+ms_table_file <- system.file(
+  "extdata/ibe-ibr-demo/multi_surface_aicc.csv",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(ms_table_file)) {
+  ms_table <- read.csv(ms_table_file)
+}
+```
+
+```{r display-ms-table, eval=exists("ms_table")}
+knitr::kable(
+  ms_table,
+  digits  = 3,
+  caption = "Multi-surface optimization result (err27 + ffp) with IBD/IBE covariates.",
+  row.names = FALSE
+)
+```
+
+## Interpreting Multi-Surface Results
+
+The multi-surface model (`err27.ffp`) combines both resistance surfaces into a composite predictor alongside the IBD/IBE covariates. In this demo dataset, the multi-surface AICc is the highest (worst) of all models tested — it requires k = 10 parameters with only n = 12 populations, which imposes an extreme AICc penalty. At the same time, its log-likelihood (98.30) is nearly as high as the best single-surface models.
+
+This illustrates the critical role of parameter counting with small n. The percent contribution results from the multi-surface model are also informative: `err27` contributes approximately 98.6% of the composite resistance, while `ffp` contributes only 1.4%. This indicates that in the jointly optimized composite, the two surfaces are not contributing independently — `err27` dominates, reducing the effective contribution of `ffp`.
+
+**Conclusion for this dataset:**
+
+| Hypothesis | Evidence |
+|---|---|
+| IBD (geographic distance) | Strong support — dominant baseline driver |
+| IBE (environment) | Weak support — covariates do not substantially improve over IBD alone |
+| IBR (`ffp`) | Moderate — improves AIC and R²m over baseline; not supported by AICc given small n |
+| IBR (`err27`) | Moderate — similar to `ffp` but slightly weaker LL |
+| Multi-surface IBR | Not supported — too many parameters for n = 12 |
+
+The appropriate conclusion depends on the information criterion used. When n is small and resistance surfaces require many parameters, relying solely on AICc may lead to underfitting — dismissing surfaces that genuinely affect connectivity. Combining AICc, AIC, R²m, and biological plausibility gives a more complete picture.
+
+---
+
+# The mlpe_rga() Formula Interface in Detail
+
+`mlpe_rga()` is a general-purpose function for fitting MLPE models with any set of fixed-effect predictors. It is not limited to the covariates used during optimization — you can use it after the fact to fit any model of interest.
+
+## Basic Usage
+
+```{r mlpe-basic-example, eval=!is.null(pair_data)}
+# Fit a model using the precomputed pair_data
+# (requires that pair_data has columns: gd, geo, cti_diff, hli_diff, pop)
+if (!is.null(pair_data) && all(c("geo", "cti_diff", "hli_diff", "pop") %in% names(pair_data))) {
+  gd_col <- grep("^gd$|^gen|^Fst|^gst", names(pair_data), value = TRUE)[1]
+  if (!is.na(gd_col)) {
+    formula_str <- paste(gd_col, "~ geo + cti_diff + hli_diff + (1 | pop)")
+    mod_ibd_ibe_direct <- mlpe_rga(
+      formula = as.formula(formula_str),
+      data    = pair_data,
+      REML    = FALSE
+    )
+    summary(mod_ibd_ibe_direct)
+  }
+}
+```
+
+## Multiple Covariates and Model Comparison
+
+`mlpe_rga()` returns a standard `lmerMod` object, so all standard `lme4` methods work:
+
+```{r mlpe-comparison, eval=FALSE}
+# Fit competing models
+mod_geo_only <- mlpe_rga(
+  formula = gd ~ geo + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+mod_geo_env <- mlpe_rga(
+  formula = gd ~ geo + cti_diff + hli_diff + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+mod_geo_env_resist <- mlpe_rga(
+  formula = gd ~ geo + cti_diff + hli_diff + ffp_cd + (1 | pop),
+  data    = pair_data,
+  REML    = FALSE
+)
+
+# Compare with AIC
+AIC(mod_geo_only, mod_geo_env, mod_geo_env_resist)
+
+# Inspect fixed effects
+fixef(mod_geo_env_resist)
+
+# Likelihood ratio test (models must be nested)
+anova(mod_geo_env, mod_geo_env_resist)
+```
+
+## Interpreting Fixed Effects
+
+In an MLPE model with multiple covariates, the fixed effects measure the unique contribution of each predictor after accounting for all others. For a model with `gd ~ geo + cti_diff + hli_diff + cd`:
+
+- **Intercept**: Mean genetic distance when all predictors are at zero. Not usually directly interpretable without centering predictors.
+- **`geo` coefficient**: Change in genetic distance per unit increase in geographic distance, holding resistance distance and environmental differences constant. Positive coefficient = IBD signal.
+- **`cti_diff` / `hli_diff` coefficients**: Change in genetic distance per unit increase in environmental dissimilarity, holding geography and resistance constant. Negative coefficients in this demo suggest that environmental similarity is not a barrier (or is confounded with geography).
+- **`cd` (resistance distance) coefficient**: Change in genetic distance per unit increase in resistance distance, holding all other predictors constant. This is the key IBR coefficient — positive and significant means resistance impedes gene flow beyond IBD and IBE effects.
+
+> **Tip:** Standardize all predictors (subtract mean, divide by SD) before fitting if you want to compare coefficient magnitudes directly. Raw coefficients are scaled to their predictor's units and are not directly comparable across predictors with different scales.
+
+## Using REML for Inference
+
+For AIC-based model comparison, use `REML = FALSE` (the default). For parameter estimation and confidence intervals, use `REML = TRUE`:
+
+```{r reml-example, eval=FALSE}
+# For inference on coefficients, use REML = TRUE
+mod_final_reml <- mlpe_rga(
+  formula = gd ~ geo + cti_diff + hli_diff + ffp_cd + (1 | pop),
+  data    = pair_data,
+  REML    = TRUE
+)
+
+# Confidence intervals (profile method for lme4)
+confint(mod_final_reml, method = "Wald")
+```
+
+---
+
+# Comprehensive Comparison: All Models Together
+
+Combining baseline and resistance-surface results into a single table gives the clearest picture of the evidence for IBD, IBE, and IBR:
+
+```{r combined-table, eval=exists("baseline_table") && exists("ss_table")}
+# Assemble a combined comparison table
+# (select relevant columns from each table for a clean display)
+if (exists("baseline_table") && exists("ss_table")) {
+  # Baseline table columns: model, AIC, logLik, deltaAIC, weight
+  # SS table columns: Surface, AICc, R2m, LL, etc.
+  # Show them side by side in narrative, then display SS table with baseline AICc for context
+  message("See individual tables above for baseline and resistance-surface comparisons.")
+  message("Key takeaway: ffp provides the greatest improvement over the IBD baseline.")
+}
+```
+
+A complete comparison across all model types reveals a clear hierarchy in this dataset:
+
+| Model | Type | AIC | Key finding |
+|---|---|---|---|
+| Null | Baseline | ~122 | No spatial predictors; high AIC |
+| IBE only | Baseline | ~121 | Environmental dissimilarity alone: weak |
+| IBD | Baseline | ~171 | Geographic distance: strong baseline |
+| IBD + IBE | Baseline | ~167 | Adding IBE to IBD: marginal improvement |
+| IBD + IBE + err27 | IBR | ~183 | err27 resistance: substantial improvement |
+| IBD + IBE + ffp | IBR | ~187 | ffp resistance: strongest improvement |
+| IBD + IBE + err27 + ffp | IBR | ~177 | Both surfaces: complex model, AICc penalized |
+
+The pattern suggests: IBD is the dominant process; `ffp` is the most informative resistance surface; combining both surfaces adds complexity without proportional fit improvement.
+
+---
+
+# Reporting Guidance for Publications
+
+When reporting concurrent IBD/IBE/IBR analyses, we recommend the following:
+
+## What to Report
+
+1. **Baseline model comparison table**: Present AIC/AICc values and weights for all baseline models (null, IBD-only, IBE-only, IBD+IBE). This establishes the starting point and clarifies which baseline predictors have evidence.
+
+2. **Resistance surface comparison table**: Present AICc and R^2^~m~ for each resistance surface tested, including the best baseline model as a reference row. Use the same `k.value` consistently across all models.
+
+3. **Optimized transformation parameters**: Report which transformation family was selected and the estimated shape and max parameters for each continuous surface.
+
+4. **Fixed effect estimates from the best model**: Report coefficient estimates and confidence intervals from the REML-fitted final model.
+
+5. **k.value specification**: State explicitly which `k.value` option was used and why. Results are not comparable across studies if this is not reported.
+
+## Example Methods Text
+
+> "We evaluated support for IBD, IBE, and IBR using the MLPE framework (Clarke et al. 2002) implemented in ResistanceGA2 (Peterman 2018). We first fit baseline MLPE models with geographic distance alone (IBD), environmental dissimilarity alone (IBE: pairwise CTI and HLI differences), and their combination (IBD + IBE), comparing models with AIC. Resistance surfaces were optimized against pairwise genetic distances using a genetic algorithm with log-likelihood as the objective function (k.value = 2, pop.size = 50, maxiter = 500). Each resistance surface was tested by adding the optimized pairwise resistance distances to the best baseline model. Models were compared using AICc corrected for the non-independence of pairwise observations."
+
+---
+
+# References
+
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).
+
+Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. *Journal of Agricultural, Biological, and Environmental Statistics* 7:361–372.
+
+Peterman, W. E. 2018. ResistanceGA: An R package for the optimization of resistance surfaces using genetic algorithms. *Methods in Ecology and Evolution* 9:1638–1647.
+
+Row, J. R., J.-F. Blouin-Demers, and P. J. Weatherhead. 2010. Habitat distribution influences dispersal and fine-scale genetic structure of eastern ratsnakes (*Elaphe obsoleta*) in fragmented landscapes. *Molecular Ecology* 19:4369–4383.
+
+Wang, I. J. 2013. Examining the full effects of landscape heterogeneity on spatial genetic variation: a multiple matrix regression approach for quantifying geographic and ecological isolation. *Evolution* 67:3403–3411.

@@ -2,7 +2,11 @@
 title: "Getting Started with ResistanceGA2"
 author: "Bill Peterman"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: false
 vignette: |
   %\VignetteIndexEntry{Getting Started with ResistanceGA2}
   %\VignetteEngine{knitr::rmarkdown}
@@ -10,7 +14,12 @@ vignette: |
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 5
+)
 ```
 
 ```{r libraries, message=FALSE, warning=FALSE}
@@ -18,274 +27,382 @@ library(ResistanceGA2)
 library(terra)
 ```
 
-# Overview
+---
 
-`ResistanceGA2` optimizes resistance surfaces with genetic algorithms.
+# What Is ResistanceGA2?
 
-- Resistance surfaces are supplied as `SpatRaster` objects.
-- Sample locations are supplied as point `SpatVector` objects.
-- Distance calculations can be done with `gdistance` or with Circuitscape in Julia.
-- `gdistance` compatibility is handled internally; users do not need to create `raster` objects.
-- The old `.asc` directory workflow, `sp` objects, standalone Circuitscape executable, and kernel-smoothing path are no longer part of the supported public API.
+Landscape genetics asks how the physical environment shapes the movement of individuals — and, by extension, how genes flow across the landscape. Two populations might be far apart in straight-line geographic distance, but if a highway, a mountain range, or a patch of inhospitable habitat lies between them, their genetic exchange may be far lower than geography alone would predict.
 
-This vignette is a practical starting point for the current package workflow.
+`ResistanceGA2` is an R package for *optimizing* the resistance values assigned to those landscape features. Rather than deciding in advance that "forest = low resistance, pavement = high resistance," the package uses a **genetic algorithm** to search the space of possible parameter values and find the resistance surface that best explains the observed pattern of genetic differentiation among sampled populations.
+
+## Isolation by Distance, Resistance, and Environment
+
+Three hypotheses are commonly evaluated in landscape genetics:
+
+**Isolation by Distance (IBD):** Genetic differentiation increases with geographic distance because dispersal is limited. This is the null expectation under random dispersal across a homogeneous landscape.
+
+**Isolation by Resistance (IBR):** Genetic differentiation is better explained by *effective* distance — the cost of moving through a heterogeneous landscape — than by straight-line distance. Different habitat types impede movement to different degrees, so a resistance surface is parameterized and optimized.
+
+**Isolation by Environment (IBE):** Genetic differentiation reflects differences in local environmental conditions (temperature, elevation, soil type) that reduce the probability of successful migration between ecologically dissimilar sites, even if those sites are geographically close.
+
+These three hypotheses are not mutually exclusive. In many systems, genetic structure reflects a combination of all three. `ResistanceGA2` supports workflows that test these hypotheses individually and in combination — including the `mlpe_rga()` formula interface that lets you include environmental covariates alongside resistance distances in a single MLPE model. See the `IBE_IBR_Workflow` vignette for a full worked example of concurrent IBD/IBE/IBR testing.
+
+## The Conceptual Workflow
+
+```
+  Landscape rasters               Sample locations
+  (categorical / continuous)      (SpatVector points)
+         |                               |
+         v                               v
+  +----------------------------------------------+
+  |  Resistance surface parameterization          |
+  |  (8 transformation families or class values)  |
+  +----------------------------------------------+
+         |
+         v
+  +----------------------------------------------+
+  |  Distance engine                              |
+  |  gdistance (costDistance / commuteDistance)   |
+  |  OR Julia / Circuitscape                      |
+  +----------------------------------------------+
+         |  pairwise effective distances
+         v
+  +----------------------------------------------+
+  |  MLPE model                                   |
+  |  genetic distance ~ resistance distance       |
+  |           + (1 | pop)                         |
+  +----------------------------------------------+
+         |  log-likelihood (objective)
+         v
+  +----------------------------------------------+
+  |  Genetic Algorithm                            |
+  |  searches transformation parameter space      |
+  |  maximises LL / minimises AIC                 |
+  +----------------------------------------------+
+         |
+         v
+  Optimized resistance surface + model comparison table
+```
+
+The genetic algorithm (GA) is the engine that drives the search. At each generation, a population of candidate parameter sets is evaluated: each candidate defines a specific transformation of the input raster, a distance matrix is calculated, an MLPE model is fit, and the objective function (default: log-likelihood) is returned. The GA then selects, recombines, and mutates the best candidates to produce the next generation, repeating until convergence.
+
+---
 
 # Installation
+
+Install the development version from GitHub:
 
 ```{r install, eval=FALSE}
 install.packages("devtools")
 devtools::install_github("wpeterman/ResistanceGA2", build_vignettes = TRUE)
 ```
 
-If you want the package first and the documentation second, install without
-building vignettes, then render the vignette sources later on a machine with
-Pandoc available.
+If Pandoc is not available on your machine, install without vignettes first and render the vignette sources later:
 
-# Example Data
+```{r install-no-vignettes, eval=FALSE}
+devtools::install_github("wpeterman/ResistanceGA2", build_vignettes = FALSE)
+```
 
-The package includes both larger optimization examples and lighter-weight
-objects for vignette use.
+The core dependencies are `terra`, `gdistance`, `lme4`, `GA`, and `ggplot2`. For Julia/Circuitscape support, you also need `JuliaConnectoR` and a working Julia installation — see the `Julia_Guide` vignette for setup instructions.
 
-```{r example-data}
-pts_small <- vect(samples[, 2:3], type = "points")
-pts_large <- vect(sample_pops[[1]], type = "points")
+---
 
-pts_small
+# Package Data Overview
+
+`ResistanceGA2` ships several datasets that you can use immediately for exploration and testing.
+
+## Resistance Surfaces
+
+```{r resistance-surfaces}
 resistance_surfaces
+```
+
+`resistance_surfaces` is a three-layer `SpatRaster`:
+
+- **`categorical`** — a categorically coded surface with class values representing distinct habitat types (e.g., land cover classes). The GA assigns a separate resistance value to each class.
+- **`continuous`** — a continuously varying surface (e.g., canopy cover, elevation). The GA fits a parameterized transformation curve mapping raw values to resistance values.
+- **`feature`** — a binary or near-binary surface representing a linear landscape feature (e.g., a road or river).
+
+```{r plot-surfaces, fig.cap="The three bundled resistance surface layers. Categorical (left) has discrete class values. Continuous (center) varies smoothly. Feature (right) represents a linear landscape element."}
+plot(resistance_surfaces, main = c("Categorical", "Continuous", "Feature"))
+```
+
+## Sample Locations
+
+```{r sample-data}
+# Small dataset: 25 populations
+pts_small <- vect(samples[, 2:3], type = "points")
+pts_small
+
+# Larger dataset for full optimization runs
+pts_large <- vect(sample_pops[[1]], type = "points")
+pts_large
+```
+
+`samples` contains 25 sampling locations as a matrix with x/y coordinates. `sample_pops` is a list of coordinate matrices representing multiple replicate populations; `Dc_list` contains corresponding genetic distance matrices.
+
+```{r plot-locations, fig.cap="Sample locations overlaid on the continuous resistance surface. The 25-point small dataset (filled circles) is useful for quick examples."}
+plot(resistance_surfaces[["continuous"]], main = "Sample locations")
+points(pts_small, pch = 19, col = "white", cex = 0.9)
+points(pts_small, pch = 1,  col = "black", cex = 0.9)
+```
+
+## The `raster_orig` Dataset
+
+```{r raster-orig}
 raster_orig
 ```
 
-`samples` and `resistance_surfaces` are useful for lightweight examples and
-precomputed outputs. `sample_pops`, `Dc_list`, and `raster_orig` are better
-suited to full optimization runs.
+`raster_orig` contains the `cont_orig` layer — a continuous surface intended for use with the larger `sample_pops` dataset in full optimization demonstrations. Use this layer when you want to run `SS_optim()` or `MS_optim()` with the larger sample sets.
 
-# Step 1: Prepare GA Settings
+## Precomputed Pairwise Outputs
 
-`GA.prep()` expects a `SpatRaster` supplied through the `raster` argument.
+Expensive computations (Circuitscape runs, full GA optimizations) are precomputed and stored as package data so that vignettes render quickly:
 
-For continuous surfaces, it is strongly recommended that transformation searches
-stay within the Monomolecular families unless there is a strong biological or
-ecological reason to expect a unimodal or quadratic-type relationship. Ricker
-families are more flexible, but that flexibility can increase the risk of
-overfitting when they are explored without a clear hypothesis.
+```{r precomputed-outputs}
+# Precomputed pairwise distance matrices
+names(vignette_pairwise_outputs)
 
-```{r ga-prep, message=FALSE, warning=FALSE}
-ga_inputs <- GA.prep(
-  raster = resistance_surfaces[[c("categorical", "continuous")]],
-  Results.dir = file.path(tempdir(), "ResistanceGA2-getting-started"),
-  monitor = FALSE,
-  quiet = TRUE
-)
-
-ga_inputs$layer.names
-ga_inputs$surface.type
-```
-
-If you want to state that recommendation explicitly in your setup, pass
-`select.trans = list("M", ...)` for continuous layers rather than opening the
-search across all transformation families.
-
-# Step 2: Choose a Distance Engine
-
-## gdistance
-
-Prepare a `gdistance` analysis by pairing a point `SpatVector` with the number
-of populations and, when available, a response vector.
-
-```{r gdist-prep, warning=FALSE}
-gdist_inputs <- gdist.prep(
-  n.Pops = nrow(samples),
-  samples = pts_small,
-  method = "costDistance"
-)
-
-names(gdist_inputs)
-```
-
-The package vignette data include a precomputed `gdistance` result built from
-this exact setup.
-
-```{r gdist-precomputed}
 cd_matrix <- vignette_pairwise_outputs$gdistance_commute
-
 dim(cd_matrix)
 cd_matrix[1:4, 1:4]
-```
 
-To reproduce that matrix directly:
-
-```{r gdist-live, eval=FALSE}
-cd_matrix <- Run_gdistance(
-  gdist.inputs = gdist_inputs,
-  r = resistance_surfaces[["continuous"]]
-)
-```
-
-## Circuitscape in Julia
-
-If you want to use Circuitscape, install Julia and the `Circuitscape` Julia
-package, then prepare inputs with `jl.prep()`. A Julia-specific guide is
-provided in the separate `Julia_Guide` vignette.
-
-`jl.prep()` and `Run_CS.jl()` need the Julia `bin/` directory. This will be specific to your local machine and must be uniquely specified.
-
-```{r julia-home, eval=FALSE}
-JULIA_HOME <- "C:/Users/your-name/AppData/Local/Programs/Julia-1.11.4/bin/"
-Sys.setenv(JULIA_BINDIR = JULIA_HOME)
-```
-
-```{r julia-home-run, include=FALSE}
-JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia-1.11.4/bin/"
-Sys.setenv(JULIA_BINDIR = JULIA_HOME)
-```
-
-```{r jl-prep, eval=FALSE}
-pairwise_genetic <- lower(as.matrix(dist(samples[, 2:3])))
-
-jl_inputs <- jl.prep(
-  n.Pops = nrow(samples),
-  response = pairwise_genetic,
-  CS_Point.File = pts_small,
-  JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
-  run_test = TRUE
-)
-```
-
-The package also ships a precomputed pairwise Circuitscape result and a
-precomputed current map based on the same small example.
-
-```{r jl-precomputed}
 cs_vector <- vignette_pairwise_outputs$circuitscape_matrix
-
 length(cs_vector)
 head(cs_vector)
 ```
 
 ```{r current-map}
+# Precomputed Circuitscape current map (stored as a PackedSpatRaster)
 vignette_current_map
 ```
 
-# Step 3: Fit Optimization Workflows
+---
 
-## Single-surface optimization
+# The Four-Step Workflow
 
-For a real optimization run, it is usually better to work from the larger toy
-data bundled with the package.
+Every analysis in `ResistanceGA2` follows the same four-step structure, regardless of whether you are testing one surface or many, using `gdistance` or Julia, or running a single replicate or a full bootstrap.
 
-```{r ss-workflow, eval=FALSE}
-pts <- vect(sample_pops[[1]], type = "points")
-gd <- lower(Dc_list[[1]])
+## Step 1: Prepare Genetic Algorithm Settings with `GA.prep()`
 
-GA.inputs <- GA.prep(
-  raster = raster_orig,
-  Results.dir = file.path(tempdir(), "ResistanceGA2-ss"),
-  pop.size = 25,
-  maxiter = 10,
-  run = 5,
-  monitor = FALSE,
-  quiet = TRUE
+`GA.prep()` configures the genetic algorithm and records metadata about each resistance surface layer (type, transformation families to consider, parameter bounds).
+
+```{r ga-prep, message=FALSE, warning=FALSE}
+ga_inputs <- GA.prep(
+  raster      = resistance_surfaces[[c("categorical", "continuous")]],
+  Results.dir = file.path(tempdir(), "ResistanceGA2-getting-started"),
+  monitor     = FALSE,
+  quiet       = TRUE
 )
 
-gdist.inputs <- gdist.prep(
-  n.Pops = nrow(sample_pops[[1]]),
-  response = gd,
-  samples = pts,
-  method = "costDistance"
+# Layer names and types detected automatically
+ga_inputs$layer.names
+ga_inputs$surface.type
+```
+
+Key arguments to know:
+
+| Argument | Default | Purpose |
+|---|---|---|
+| `raster` | — | `SpatRaster` with one layer per surface hypothesis |
+| `Results.dir` | — | Directory where tables and plots will be saved |
+| `method` | `"LL"` | Objective function: `"LL"`, `"AIC"`, or `"R2"` |
+| `select.trans` | auto | List of transformation families per layer (`"M"`, `"R"`, `"A"`, or `NA` for categorical) |
+| `pop.size` | 50 | GA population size (individuals per generation) |
+| `maxiter` | 1000 | Maximum GA generations |
+| `run` | 50 | Generations of no improvement before stopping |
+| `parallel` | TRUE | Use parallel processing |
+| `k.value` | 2 | How to count model complexity for AIC/AICc |
+
+> **Tip:** For continuous surfaces, restrict `select.trans` to Monomolecular families (`"M"`) unless you have a specific biological reason to expect a unimodal response. Ricker families are more flexible but increase overfitting risk. For example: `select.trans = list("M", "M")` for a two-layer continuous raster.
+
+## Step 2: Prepare Distance Engine Inputs
+
+### Using gdistance
+
+`gdist.prep()` sets up everything needed to compute pairwise least-cost or commute-time distances inside R. No external software is required.
+
+```{r gdist-prep, warning=FALSE}
+gdist_inputs <- gdist.prep(
+  n.Pops  = nrow(samples),
+  samples = pts_small,
+  method  = "costDistance"
 )
 
+names(gdist_inputs)
+```
+
+The `method` argument selects between:
+
+- **`"costDistance"`**: Dijkstra's least-cost path algorithm. Faster; analogous to the least-cost corridor concept.
+- **`"commuteDistance"`**: Random-walk commute time. Slower but conceptually closer to Circuitscape's effective resistance.
+
+### Using Julia / Circuitscape
+
+For Circuitscape-based distances, use `jl.prep()`. This requires a working Julia installation with `Circuitscape.jl`. See the `Julia_Guide` vignette for full setup instructions.
+
+```{r jl-prep, eval=FALSE}
+jl_inputs <- jl.prep(
+  n.Pops        = nrow(samples),
+  response      = lower(as.matrix(dist(samples[, 2:3]))),
+  CS_Point.File = pts_small,
+  JULIA_HOME    = Sys.getenv("JULIA_BINDIR"),
+  run_test      = TRUE,
+  silent        = TRUE
+)
+```
+
+> **Note:** You only need to prepare *one* distance engine — gdistance or Julia, not both. For iterative optimization over many surfaces, `gdistance` is usually faster. For final Circuitscape-matched outputs or current maps, use Julia.
+
+## Step 3: Run Optimization
+
+With both `ga_inputs` and a distance engine object ready, call the appropriate optimization function:
+
+- `SS_optim()` — optimize each surface individually (single-surface)
+- `MS_optim()` — optimize all surfaces simultaneously as a composite (multi-surface)
+- `all_comb()` — systematically test all combinations of surfaces up to a specified size
+
+```{r ss-optim-eval, eval=FALSE}
+# Single-surface optimization (one run per layer)
 ss_out <- SS_optim(
-  gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
-  dist_mod = FALSE,
-  null_mod = FALSE,
+  gdist.inputs    = gdist_inputs,
+  GA.inputs       = ga_inputs,
+  dist_mod        = TRUE,   # also fit an IBD distance model
+  null_mod        = TRUE,   # also fit a null (intercept-only) model
   diagnostic_plots = FALSE
 )
-```
 
-## Multisurface optimization
-
-```{r ms-workflow, eval=FALSE}
+# Multi-surface optimization (all layers combined)
 ms_out <- MS_optim(
-  gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
+  gdist.inputs    = gdist_inputs,
+  GA.inputs       = ga_inputs,
   diagnostic_plots = FALSE
 )
 ```
 
-## All-combinations analysis
+For a full worked example with precomputed results, see the `ResistanceGA` vignette.
 
-`all_comb()` requires `Results.dir = "all.comb"` at the `GA.prep()` stage, then
-uses a separate results directory for the actual output. That output directory
-will be created automatically when needed.
+## Step 4: Interpret and Compare Results
 
-```{r all-comb, eval=FALSE}
-GA.inputs_all <- GA.prep(
-  raster = raster_orig,
-  Results.dir = "all.comb",
-  pop.size = 25,
-  maxiter = 10,
-  run = 5,
-  monitor = FALSE,
-  quiet = TRUE
-)
+Optimization functions return structured lists. The most important components are:
 
-results_dir <- file.path(tempdir(), "ResistanceGA2-all-comb")
+- `$AICc` — model comparison table with AIC, AICc, R^2^~m~, R^2^~c~, LL, and k values
+- `$ContinuousResults` / `$CategoricalResults` — optimized parameter estimates
+- `$cd` — list of pairwise distance matrices for the winning surfaces
+- `$MLPE.list` — fitted MLPE model objects for downstream inference
 
-all_out <- all_comb(
-  gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs_all,
-  results.dir = results_dir,
-  max.combination = 2,
-  iters = 10,
-  replicate = 1
-)
+```{r results-preview, eval=FALSE}
+# View model comparison table
+knitr::kable(ss_out$AICc, digits = 2, caption = "Single-surface model comparison")
+
+# View optimized transformation parameters
+ss_out$ContinuousResults
 ```
 
-# Transformations and Inspection
+---
 
-Two useful helpers for inspecting resistance transformations are `Plot.trans()`
-and `Resistance.tran()`.
+# Visualizing Transformations
 
-```{r plot-trans}
+Before running a full optimization, it is useful to explore how the transformation families reshape a resistance surface. `Plot.trans()` shows the relationship between raw raster values and transformed resistance values for a given parameter set.
+
+```{r plot-trans, fig.cap="A Monomolecular transformation applied to the continuous resistance surface. Low values in the original raster receive low resistance; the curve saturates at high values."}
 Plot.trans(
-  PARM = c(2.5, 100),
-  Resistance = resistance_surfaces[["continuous"]],
+  PARM           = c(2.5, 100),
+  Resistance     = resistance_surfaces[["continuous"]],
   transformation = "Monomolecular",
-  marginal.plot = FALSE
+  marginal.plot  = FALSE
 )
 ```
+
+You can also apply a transformation directly to obtain a new `SpatRaster`:
 
 ```{r resistance-tran}
-transformed_surface <- Resistance.tran(
+transformed <- Resistance.tran(
   transformation = "Monomolecular",
-  shape = 2.5,
-  max = 100,
-  r = resistance_surfaces[["continuous"]]
+  shape          = 2.5,
+  max            = 100,
+  r              = resistance_surfaces[["continuous"]]
 )
-
-transformed_surface
+transformed
 ```
 
-# Interpreting Outputs
+The two parameters that define every continuous transformation are:
 
-The main optimization functions return lists containing:
+- **`shape`**: Controls the curvature of the response. Small values produce gradual curves; large values produce steep thresholds.
+- **`max`**: The maximum resistance value assigned to the most resistant cells. The minimum is always scaled to 1.
 
-- GA summaries and fitted models
-- AICc tables for model comparison
-- Pairwise distance objects used downstream
-- saved plot and table outputs beneath the specified `Results.dir`
+For a complete description of all eight transformation families and guidance on choosing among them, see the `Surface_Transformations` vignette.
 
-For larger or slower analyses, it is often worth running multiple replicates and
-checking for consistency in the top-supported surfaces and parameter estimates.
+---
 
-# Migration Checklist
+# Key Terms Glossary
 
-When updating older scripts, the key changes are:
+**Resistance surface:** A raster in which each cell value represents the cost of moving through that cell. High values mean high resistance (impeded movement).
 
-- pass `SpatRaster` objects, not directories of `.asc` files
-- pass point `SpatVector` objects, not `SpatialPoints`
-- use `JuliaConnectoR` and Julia/Circuitscape.jl, not `JuliaCall`, `XRJulia`, or the standalone `.exe`
-- do not rely on the removed `scale = TRUE` / kernel-smoothing workflow
+**Effective distance:** A pairwise measure of the total movement cost between two locations, computed by accumulating resistance across the landscape path.
 
-If you stay within that contract, the package workflow is much simpler and much
-more consistent than the old mixed raster/file/path interface.
+**MLPE (Maximum Likelihood Population Effects):** A mixed-effects model for pairwise distance data that accounts for the non-independence of observations sharing a common sample location (Clarke et al. 2002).
+
+**Genetic algorithm (GA):** A stochastic optimization method that maintains a population of candidate solutions, applies selection, crossover, and mutation operators, and converges toward high-fitness parameter regions.
+
+**Transformation family:** One of eight parameterized curve shapes (Monomolecular, Reverse Monomolecular, Inverse Monomolecular, Inverse-Reverse Monomolecular, and four Ricker equivalents) that map raw raster values to resistance values.
+
+**Log-likelihood (LL):** The default objective function for optimization. The GA maximizes LL of the MLPE model, which corresponds to finding the resistance surface that best explains pairwise genetic distances.
+
+**AICc:** Corrected Akaike Information Criterion. Used for model comparison after optimization. Lower values indicate better-fitting models penalized for complexity.
+
+**k.value:** A user-selected rule for counting the number of parameters in the AIC/AICc calculation. Different defensible choices exist; the default (`k.value = 2`) should be reported in publications.
+
+**IBD / IBR / IBE:** Isolation by Distance / Resistance / Environment — three competing (and complementary) hypotheses about the drivers of spatial genetic structure.
+
+---
+
+# Other Vignettes
+
+| Vignette | Description |
+|---|---|
+| `ResistanceGA` | Full workflow tutorial with single-surface, multi-surface, all-combinations, and bootstrap analyses using precomputed results |
+| `Surface_Transformations` | Detailed explanation of all eight transformation families, when to use each, and how to constrain the GA search |
+| `IBE_IBR_Workflow` | Concurrent testing of IBD, IBE, and IBR using `mlpe_rga()` with covariates and the ibe-ibr-demo dataset |
+| `Julia_Guide` | Installing Julia, configuring `JuliaConnectoR`, running Circuitscape, and troubleshooting |
+
+Access any vignette with:
+
+```{r vignette-access, eval=FALSE}
+vignette("ResistanceGA",         package = "ResistanceGA2")
+vignette("Surface_Transformations", package = "ResistanceGA2")
+vignette("IBE_IBR_Workflow",     package = "ResistanceGA2")
+vignette("Julia_Guide",          package = "ResistanceGA2")
+```
+
+---
+
+# Tips for New Users
+
+**Start small.** Use `resistance_surfaces` and `samples` for your first runs. Keep `pop.size` at 25 and `maxiter` at 50-100 to get fast results and verify your workflow before scaling up.
+
+**Use Monomolecular first.** The Monomolecular family covers most ecologically realistic resistance–covariate relationships. It is harder to overfit and easier to interpret than Ricker families. Only include Ricker families if you have a biological hypothesis that predicts a peaked or threshold-type response.
+
+**Run replicates.** Genetic algorithms are stochastic. If the same surface wins consistently across replicate runs with similar parameter estimates, that is a more trustworthy result than a single run.
+
+**Check diagnostic plots.** Set `diagnostic_plots = TRUE` in `SS_optim()` or `MS_optim()`. Residual plots and the observed-vs-predicted scatter are among the fastest ways to detect poor fits.
+
+**Report k.value.** Because there is no universally accepted way to count parameters in pairwise MLPE models, you should always report which `k.value` option you used and justify the choice in your methods.
+
+**Save your Results.dir outputs.** The functions write tables and plots to `Results.dir`. These are useful for comparing runs and documenting the optimization trajectory.
+
+> **Warning:** Do not interpret optimization as hypothesis testing. Finding that a particular resistance surface has the lowest AICc does not mean the alternative surfaces are false — it means the data, as analyzed, are more consistent with that parameterization. Replication, cross-validation, and biological interpretation are essential complements to the optimization output.
+
+---
+
+# References
+
+Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. *Journal of Agricultural, Biological, and Environmental Statistics* 7:361–372.
+
+Peterman, W. E. 2018. ResistanceGA: An R package for the optimization of resistance surfaces using genetic algorithms. *Methods in Ecology and Evolution* 9:1638–1647.
+
+Peterman, W. E., G. M. Connette, R. D. Semlitsch, and L. S. Eggert. 2014. Ecological resistance surfaces predict fine-scale genetic differentiation in a terrestrial woodland salamander. *Molecular Ecology* 23:2402–2413.
+
+McRae, B. H. 2006. Isolation by resistance. *Evolution* 60:1551–1561.
+
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).

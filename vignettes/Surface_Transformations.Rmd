@@ -1,0 +1,551 @@
+---
+title: "Resistance Surface Transformations"
+author: "Bill Peterman"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: false
+vignette: |
+  %\VignetteIndexEntry{Resistance Surface Transformations}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  message   = FALSE,
+  warning   = FALSE
+)
+```
+
+```{r libraries}
+library(ResistanceGA2)
+library(terra)
+library(ggplot2)
+```
+
+---
+
+# Why Transform Resistance Surfaces?
+
+When modeling landscape connectivity, we start with a raw environmental layer — perhaps canopy cover, elevation, percent impervious surface, or NDVI — and convert it into a resistance surface. The simplest approach would be to use the raw values directly: higher canopy cover means lower resistance (for a forest-dependent species), so we could just invert the raw values. But this assumes a *linear* relationship between the raw covariate and the movement cost it generates, and linear relationships are rarely the right biological assumption.
+
+Consider a forest-dependent salamander moving across a landscape of varying canopy cover. At low canopy cover (say, 10–30%), even small increases in canopy might dramatically reduce resistance — the difference between an open field and a sparse woodlot matters enormously. At high canopy cover (80–100%), the additional canopy may have little further effect — all dense forest provides similarly good habitat, and the marginal benefit of an extra 5% canopy is small. This pattern — steeply decreasing resistance at low values, leveling off at high values — is a *Monomolecular* relationship.
+
+Alternatively, consider a road-crossing bird. At very low road density, roads are rare enough that they impose little resistance. At moderate road density, roads fragment the landscape and substantially impede gene flow. At very high road density (dense urban areas), the bird simply doesn't attempt to cross — resistance is high and roughly constant. This peaked relationship — low resistance at low and high values, high resistance at intermediate values — is a *Ricker* pattern.
+
+The eight transformation families in `ResistanceGA2` provide a flexible vocabulary for these ecological relationships. Rather than choosing the transformation a priori, the genetic algorithm searches the parameter space and identifies which shape — and which parameter values — best explains the observed genetic differentiation.
+
+---
+
+# The Transformation Parameter Space
+
+Every continuous-surface transformation in `ResistanceGA2` is defined by two parameters:
+
+## Shape
+
+The `shape` parameter controls the curvature of the response curve. It is always positive.
+
+- **Small shape values** (e.g., 0.5–2): Gradual, shallow curves. The response changes slowly across the full range of raw values.
+- **Large shape values** (e.g., 5–15): Steep curves. The response changes rapidly near the inflection point and then levels off or drops sharply, creating a near-threshold effect.
+
+In ecological terms, a large shape value implies that the landscape variable acts as a near-binary switch: below a threshold, resistance is near the minimum; above the threshold, resistance is near the maximum (or vice versa). A small shape value implies a graded, continuous effect throughout the covariate range.
+
+## Max
+
+The `max` parameter sets the maximum resistance value assigned to any cell. It is always greater than 1, because the minimum resistance is constrained to 1.
+
+- A `max` of 10 means the most resistant cell is 10× more costly to cross than the least resistant cell.
+- A `max` of 1000 means the most resistant cell is 1000× more costly — a near-barrier.
+- In the absence of strong a priori knowledge, allowing the GA to estimate `max` from a broad range (default: 1 to 500 or 1000) lets the data determine the appropriate resistance contrast.
+
+> **Note:** The biological interpretation of `max` depends on the distance engine used. For `costDistance`, the accumulated cost is a sum of cell values along the least-cost path, so very large `max` values can create effectively impassable barriers. For `commuteDistance` and Circuitscape, very high resistance creates high pairwise resistance distances but does not create absolute barriers.
+
+---
+
+# The Eight Transformation Families
+
+The eight families are organized into two groups — Monomolecular and Ricker — each with four variants produced by inverting (flipping the y-axis) and reversing (flipping the x-axis) the base curve. The variants allow the GA to represent all four possible "directions" of monotone and peaked responses.
+
+We illustrate each family using the `raster_orig` continuous surface with illustrative parameters (`shape = 2.5`, `max = 100`).
+
+```{r helper-functions, include=FALSE}
+# Helper to compute transformation curves for plotting
+scale_vector <- function(x, min_out, max_out) {
+  rng <- max(x) - min(x)
+  if (rng < 1e-10) return(rep(min_out, length(x)))
+  ((x - min(x)) * (max_out - min_out) / rng) + min_out
+}
+
+transform_curve <- function(transformation, x, shape, max_value) {
+  if (transformation == "Monomolecular") {
+    max_value * (1 - exp(-x / shape)) + 1
+  } else if (transformation == "Reverse Monomolecular") {
+    y <- max_value * (1 - exp(-x / shape)) + 1
+    rev(y)
+  } else if (transformation == "Inverse Monomolecular") {
+    y <- -max_value * (1 - exp(-x / shape)) - 1
+    scale_vector(y, abs(max(y)), abs(min(y)))
+  } else if (transformation == "Inverse-Reverse Monomolecular") {
+    y <- -max_value * (1 - exp(-x / shape)) - 1
+    rev(scale_vector(y, abs(max(y)), abs(min(y))))
+  } else if (transformation == "Ricker") {
+    max_value * x * exp(-x / shape) + 1
+  } else if (transformation == "Reverse Ricker") {
+    y <- max_value * x * exp(-x / shape) + 1
+    rev(y)
+  } else if (transformation == "Inverse Ricker") {
+    y <- -(max_value * x * exp(-x / shape)) - 1
+    scale_vector(y, abs(max(y)), abs(min(y)))
+  } else if (transformation == "Inverse-Reverse Ricker") {
+    y <- -(max_value * x * exp(-x / shape)) - 1
+    rev(scale_vector(y, abs(max(y)), abs(min(y))))
+  } else {
+    stop("Unknown transformation: ", transformation)
+  }
+}
+
+range_stats  <- terra::global(raster_orig[["cont_orig"]], c("min", "max"), na.rm = TRUE)
+orig_vals    <- seq(range_stats$min, range_stats$max, length.out = 300)
+scaled_vals  <- scale_vector(orig_vals, 0, 10)
+shape_val    <- 2.5
+max_val      <- 100
+
+curve_names <- c(
+  "Monomolecular", "Reverse Monomolecular",
+  "Inverse Monomolecular", "Inverse-Reverse Monomolecular",
+  "Ricker", "Reverse Ricker",
+  "Inverse Ricker", "Inverse-Reverse Ricker"
+)
+
+curve_df <- do.call(rbind, lapply(curve_names, function(nm) {
+  data.frame(
+    original      = orig_vals,
+    transformed   = transform_curve(nm, scaled_vals, shape_val, max_val),
+    Transformation = factor(nm, levels = curve_names)
+  )
+}))
+```
+
+---
+
+## Monomolecular Families
+
+### Monomolecular
+
+**Mathematical form:** `resistance = max * (1 - exp(-x / shape)) + 1`
+
+The Monomolecular curve rises steeply from 1 at low values of the covariate, then decelerates and asymptotes near `max + 1`. It is the most commonly appropriate transformation for resistance modeling because many ecological variables have diminishing-returns effects.
+
+**Biological interpretation:** Resistance increases with the covariate and saturates at high values. Suitable when the landscape variable represents a *cost* that increases with its value but has an upper limit — for example:
+
+- Percent impervious surface: small amounts cause some resistance, but above ~80% impervious, additional pavement adds little marginal cost (the landscape is already effectively impassable for most terrestrial species).
+- Temperature deviation from optimum: small deviations are tolerable; large deviations are uniformly unfavorable.
+
+**When to use:** When you expect resistance to *increase* with the covariate and *saturate* at high values. This is the default and most ecologically conservative choice.
+
+```{r mono, fig.cap="Monomolecular transformation: resistance increases with covariate value and saturates at high values."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Monomolecular",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Reverse Monomolecular
+
+**Mathematical form:** Same as Monomolecular, but applied to the reversed covariate values (i.e., the curve is flipped left-to-right).
+
+**Biological interpretation:** Resistance *decreases* with the covariate and saturates at low values. Suitable when the landscape variable represents a *habitat quality* that increases movement ease — for example:
+
+- Forest cover: dense forest is easy to traverse for forest specialists; the effect saturates — once you have 80% canopy, adding more doesn't help much more.
+- NDVI (greenness): high NDVI = suitable habitat = low resistance for many terrestrial species.
+
+**When to use:** When you expect resistance to *decrease* with the covariate and *saturate* at high values of habitat quality.
+
+```{r rev-mono, fig.cap="Reverse Monomolecular: resistance decreases with covariate value and saturates at high values."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Reverse Monomolecular",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Inverse Monomolecular
+
+**Biological interpretation:** Resistance *decreases* with the covariate but does so rapidly at low values and then levels off at high values. Similar to Reverse Monomolecular, but the approach is from a high-resistance baseline rather than a high-resistance peak. Suitable when:
+
+- Movement ability increases sharply at first with the covariate (e.g., a threshold amount of moisture is needed for dispersal), then levels off.
+
+**When to use:** When a small increase in covariate value rapidly reduces resistance, but additional increases have little further effect.
+
+```{r inv-mono, fig.cap="Inverse Monomolecular: resistance decreases rapidly at low covariate values, then stabilizes."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Inverse Monomolecular",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Inverse-Reverse Monomolecular
+
+**Biological interpretation:** Resistance *increases* with the covariate, doing so rapidly at high values and leveling off at low values. This is the mirror image of the Inverse Monomolecular. Suitable when:
+
+- A threshold must be crossed before resistance rises substantially (e.g., a road network only becomes a barrier once road density exceeds a critical level).
+
+**When to use:** When resistance increases sharply only at high covariate values, with a near-flat response at low values.
+
+```{r inv-rev-mono, fig.cap="Inverse-Reverse Monomolecular: resistance remains low at low covariate values and rises sharply at high values."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Inverse-Reverse Monomolecular",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+## Ricker Families
+
+The Ricker family produces peaked (unimodal) curves — resistance is lowest at the extremes of the covariate range and highest at intermediate values (or vice versa for the inverse variants). They were adapted from the Ricker stock-recruitment model in fisheries science.
+
+> **Caution:** Ricker transformations are more flexible than Monomolecular families and can fit a wider variety of curve shapes, including near-monotone shapes when shape parameters are extreme. This flexibility comes at the cost of increased overfitting risk. Use Ricker families only when you have a biological hypothesis that predicts a peaked resistance response.
+
+### Ricker
+
+**Mathematical form:** `resistance = max * x * exp(-x / shape) + 1`
+
+This creates a bell-shaped curve with a peak at intermediate covariate values. The peak location is controlled by `shape` (higher shape = peak at higher covariate values).
+
+**Biological interpretation:** Resistance is highest at intermediate covariate values. Examples include:
+
+- Elevation: A species optimally adapted to mid-elevation forests might show high resistance at both valley bottoms (unsuitable low-elevation habitat) and high mountain peaks (harsh alpine conditions), with easy movement through the mid-elevation band.
+- Intermediate disturbance: Resistance is lowest in very undisturbed and very disturbed patches, highest in moderately disturbed ones (less common but possible for some urban-adapted species).
+
+**When to use:** When you have a clear biological prediction about a peaked response — not simply because the Ricker curve fits the data better.
+
+```{r ricker, fig.cap="Ricker transformation: resistance peaks at intermediate covariate values."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Ricker",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Reverse Ricker
+
+**Biological interpretation:** Resistance is *lowest* at intermediate covariate values and highest at the extremes. A species might move most easily through mid-gradient environments and face high resistance at both extremes.
+
+**When to use:** When movement ease peaks at intermediate values of the covariate — for example, if a species preferentially uses ecotonal habitat between two unsuitable extremes.
+
+```{r rev-ricker, fig.cap="Reverse Ricker: resistance is lowest at intermediate covariate values."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Reverse Ricker",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Inverse Ricker
+
+**Biological interpretation:** Similar to Ricker but with the y-axis inverted and rescaled. Resistance is highest in the middle of the covariate range with a different scaling behavior. Most useful when combined with other surfaces in a multi-surface model.
+
+**When to use:** When a peaked response is hypothesized but the Ricker parameterization does not provide enough flexibility in scaling.
+
+```{r inv-ricker, fig.cap="Inverse Ricker: peaked resistance response with inverted scaling."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Inverse Ricker",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+### Inverse-Reverse Ricker
+
+**Biological interpretation:** The most complex of the Ricker family. Resistance is lowest at the extremes, with a trough at intermediate values — but with a specific asymmetric scaling. This is the rarest ecological scenario among the eight families.
+
+**When to use:** Very specific peaked habitat preference scenarios. If you find yourself using this family without a clear biological hypothesis, you may be overfitting.
+
+```{r inv-rev-ricker, fig.cap="Inverse-Reverse Ricker: complex peaked response with inverted and reversed scaling."}
+Plot.trans(
+  PARM           = c(2.5, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Inverse-Reverse Ricker",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+# Comparing All Eight Families
+
+The figure below shows all eight transformation families side by side using the same illustrative parameters (`shape = 2.5`, `max = 100`) applied to the range of the `cont_orig` surface. The purpose is to show the geometric diversity of the available curves, not to suggest these parameters are optimal for any real analysis.
+
+```{r all-families, fig.width=12, fig.height=7, fig.cap="All eight transformation families at shape=2.5, max=100. Top row: Monomolecular family. Bottom row: Ricker family. Within each row: base, reverse, inverse, and inverse-reverse variants."}
+ggplot(curve_df, aes(x = original, y = transformed)) +
+  geom_line(linewidth = 0.9) +
+  facet_wrap(~ Transformation, ncol = 4, scales = "free_y") +
+  theme_bw() +
+  labs(
+    x = "Original covariate value",
+    y = "Transformed resistance"
+  ) +
+  theme(
+    strip.text  = element_text(face = "bold", size = 8),
+    axis.text   = element_text(size = 8),
+    axis.title  = element_text(size = 10)
+  )
+```
+
+Key observations from this comparison:
+
+1. **Monomolecular families are all monotone.** They produce one-directional responses — resistance either increases or decreases with the covariate, but never both.
+2. **Ricker families produce peaks or troughs.** They can represent non-monotone responses where intermediate covariate values have a qualitatively different resistance than the extremes.
+3. **Inverse and Inverse-Reverse variants rescale the y-axis** to ensure resistances are always positive and in the [1, max+1] range. The shapes are ecologically distinct from their non-inverse counterparts despite superficial visual similarity at some parameter values.
+
+---
+
+# The Flat Distance Transformation
+
+In addition to the eight transformation families, `ResistanceGA2` includes a **Distance** (flat) transformation. This assigns a constant resistance of 1 to every cell, making the effective distance equivalent to Euclidean distance (for `costDistance`) or a random-walk equivalent.
+
+The Distance transformation serves as a model for **Isolation by Distance (IBD)**: genetic differentiation increases with geographic distance, with no heterogeneous landscape influence. Including it in `SS_optim()` (via `dist_mod = TRUE`) provides an important baseline — if geographic distance explains genetic patterns as well as any resistance surface, there is no evidence for landscape-mediated connectivity.
+
+```{r distance-trans, eval=FALSE}
+# The Distance transformation is fit automatically when dist_mod = TRUE in SS_optim()
+ss_out <- SS_optim(
+  gdist.inputs = gdist_inputs,
+  GA.inputs    = ga_inputs,
+  dist_mod     = TRUE,   # adds flat-distance IBD model
+  null_mod     = TRUE    # adds intercept-only null model
+)
+```
+
+---
+
+# Choosing Transformation Families
+
+## Practical Guidance
+
+**Default: Monomolecular (`"M"`)**
+
+For most ecological variables and most study systems, one of the four Monomolecular families is the appropriate choice. Monomolecular curves:
+
+- Cover all four directions of monotone resistance–covariate relationships.
+- Have intuitive parameters (shape = curvature, max = amplitude).
+- Are less prone to overfitting than Ricker families.
+- Are easier to interpret and communicate to non-specialists.
+
+Unless you have a specific biological hypothesis that predicts a peaked resistance response, restrict the search to Monomolecular families:
+
+```{r select-trans-mono, eval=FALSE}
+# For a single continuous layer: Monomolecular only
+ga_inputs <- GA.prep(
+  raster       = raster_orig,
+  Results.dir  = file.path(tempdir(), "rga2-mono"),
+  select.trans = list("M")
+)
+
+# For two continuous layers: Monomolecular only for both
+ga_inputs_2 <- GA.prep(
+  raster       = resistance_surfaces[[c("continuous", "feature")]],
+  Results.dir  = file.path(tempdir(), "rga2-mono-2"),
+  select.trans = list("M", "M")
+)
+```
+
+**When Ricker Makes Sense**
+
+Consider including Ricker families (`"R"` or `"A"` for all) when:
+
+- The species has a known habitat preference for mid-gradient conditions (e.g., mid-elevation specialists).
+- Pilot data or expert knowledge suggests that intermediate values of the covariate are qualitatively different from the extremes.
+- You are running a confirmatory (rather than exploratory) analysis testing a specific peaked-response hypothesis.
+
+```{r select-trans-ricker, eval=FALSE}
+# Include all 8 families for one layer
+ga_inputs_all <- GA.prep(
+  raster       = raster_orig,
+  Results.dir  = file.path(tempdir(), "rga2-all"),
+  select.trans = list("A")   # "A" = all 8 families
+)
+
+# Monomolecular for one layer, all families for another
+ga_inputs_mixed <- GA.prep(
+  raster       = resistance_surfaces[[c("continuous", "feature")]],
+  Results.dir  = file.path(tempdir(), "rga2-mixed"),
+  select.trans = list("M", "A")
+)
+```
+
+## The `select.trans` Argument
+
+The `select.trans` argument in `GA.prep()` is a list with one element per surface layer. Each element specifies which transformation families to include in the search for that layer:
+
+| Value | Families included |
+|---|---|
+| `"M"` | All four Monomolecular variants |
+| `"R"` | All four Ricker variants |
+| `"A"` | All eight families (Monomolecular + Ricker) |
+| `NA` | No transformation (categorical surface: class-specific values) |
+
+The default behavior detects layer type automatically and applies `"M"` for continuous layers and `NA` for categorical layers. You can inspect what was selected:
+
+```{r select-trans-inspect}
+ga_inputs_check <- GA.prep(
+  raster      = resistance_surfaces[[c("categorical", "continuous")]],
+  Results.dir = file.path(tempdir(), "rga2-check"),
+  monitor     = FALSE,
+  quiet       = TRUE
+)
+
+ga_inputs_check$select.trans
+ga_inputs_check$surface.type
+```
+
+---
+
+# Applying Transformations Directly
+
+## Resistance.tran()
+
+`Resistance.tran()` applies a specific transformation with given parameters to a raster, returning the transformed `SpatRaster`. This is useful for:
+
+- Visualizing what a particular parameter set looks like on the landscape.
+- Applying the optimal parameters from an optimization run to generate the final resistance surface.
+- Creating transformed surfaces for use in custom MLPE models via `mlpe_rga()`.
+
+```{r resistance-tran-examples}
+# Monomolecular transformation
+r_mono <- Resistance.tran(
+  transformation = "Monomolecular",
+  shape = 3,
+  max   = 150,
+  r     = raster_orig[["cont_orig"]]
+)
+
+# Ricker transformation
+r_rick <- Resistance.tran(
+  transformation = "Ricker",
+  shape = 2,
+  max   = 100,
+  r     = raster_orig[["cont_orig"]]
+)
+
+# Reverse Monomolecular (resistance decreases with covariate)
+r_revmono <- Resistance.tran(
+  transformation = "Reverse Monomolecular",
+  shape = 2,
+  max   = 200,
+  r     = raster_orig[["cont_orig"]]
+)
+
+# Compare visually
+compare_stack <- c(r_mono, r_rick, r_revmono)
+names(compare_stack) <- c("Monomolecular", "Ricker", "Rev. Monomolecular")
+plot(compare_stack)
+```
+
+## Plot.trans()
+
+`Plot.trans()` shows the transformation curve alongside a marginal histogram of the original raster values, making it easy to see how the transformation maps the covariate distribution to the resistance scale.
+
+```{r plot-trans-examples, fig.cap="Monomolecular (shape=2, max=100) showing the transformation curve and the distribution of original values."}
+Plot.trans(
+  PARM           = c(2, 100),
+  Resistance     = raster_orig[["cont_orig"]],
+  transformation = "Monomolecular",
+  marginal.plot  = FALSE
+)
+```
+
+---
+
+# How the GA Searches Transformation Space
+
+During optimization, the genetic algorithm encodes each candidate solution as a vector of parameters. For a single continuous surface, this vector contains:
+
+1. An integer index selecting the transformation family (from the families in `select.trans`).
+2. The `shape` parameter (searched over a range, typically 0.5–15).
+3. The `max` parameter (searched over a range, typically 1–500 or 1–1000).
+
+For categorical surfaces, the vector contains one resistance value per class (searched over a range, typically 1–2500 per class).
+
+For multi-surface models, the vector concatenates the parameter blocks for all surfaces plus a weight vector.
+
+The GA does not evaluate all points on a grid. Instead, it maintains a population of candidate vectors, evaluates fitness (log-likelihood), and uses crossover and mutation to move toward high-fitness regions. This makes it effective at finding good solutions in high-dimensional continuous parameter spaces without exhaustive enumeration.
+
+> **Note:** Because the GA is stochastic, results can vary slightly across runs. This is expected and not a sign of failure — it reflects natural variation in exploration paths. Consistent results across replicate runs are a sign that the optimization has converged to a stable region.
+
+## Collapsing to the Distance Solution
+
+During optimization, if a Ricker-family curve's shape parameter becomes very large, the peaked curve can degenerate toward a flat line — effectively mimicking the Distance transformation. `ResistanceGA2` detects this degenerate case and collapses it to the flat Distance solution automatically. This prevents Ricker transformations from "cheating" by becoming effectively non-peaked while nominally remaining in the Ricker family.
+
+---
+
+# Overfitting Concerns
+
+The more transformation families you include in the search, the more flexible the model and the greater the risk of fitting noise rather than signal. Key signs of potential overfitting:
+
+1. **Inconsistent results across replicates.** If different GA runs return very different transformation families or very different parameter values, the optimization is not converging to a stable solution.
+
+2. **Very high `max` values.** A `max` of 2000 for a dataset where pairwise distances span a small range may indicate the optimizer is exploiting numerical precision rather than biology.
+
+3. **Ricker families with extreme shape values.** Very large or very small shape parameters for Ricker curves can produce near-flat responses that differ little from a Distance or Monomolecular fit but use more parameters.
+
+4. **Better fit than biologically plausible.** If a resistance surface explains > 60–70% of genetic variance in a typical landscape genetics dataset, scrutinize the results carefully. Such high explanatory power is rarely achievable unless the sampling design, genetic markers, and landscape variables are all exceptionally well-matched.
+
+> **Recommendation:** Always run at least two GA replicates. If the results are highly consistent, you can have more confidence in the stability of the transformation selection. If they differ substantially, consider restricting `select.trans` to simpler families or increasing `pop.size` and `maxiter`.
+
+---
+
+# Summary of Transformation Families
+
+| Family | Direction | Shape | When to use |
+|---|---|---|---|
+| Monomolecular | Increases, saturates high | Monotone increasing | Covariate impedes movement, effect saturates |
+| Reverse Monomolecular | Decreases, saturates low | Monotone decreasing | Covariate facilitates movement, effect saturates |
+| Inverse Monomolecular | Decreases rapidly then stable | Monotone decreasing, rapid | Threshold amount needed before effect drops |
+| Inverse-Reverse Monomolecular | Stable then increases rapidly | Monotone increasing, threshold | Resistance only rises above a threshold |
+| Ricker | Peaks at intermediate | Unimodal | Mid-gradient specialist, peaked cost |
+| Reverse Ricker | Trough at intermediate | U-shaped | Mid-gradient facilitator |
+| Inverse Ricker | Complex peaked | Peaked, inverted scale | Specific peaked hypothesis |
+| Inverse-Reverse Ricker | Complex trough | U-shaped, inverted scale | Specific trough hypothesis |
+| Distance | Flat (constant = 1) | None | IBD null / geographic distance baseline |
+
+---
+
+# References
+
+Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. *Journal of Agricultural, Biological, and Environmental Statistics* 7:361–372.
+
+Peterman, W. E. 2018. ResistanceGA: An R package for the optimization of resistance surfaces using genetic algorithms. *Methods in Ecology and Evolution* 9:1638–1647.
+
+Scrucca, L. 2013. GA: A package for genetic algorithms in R. *Journal of Statistical Software* 53:1–37.
+
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).

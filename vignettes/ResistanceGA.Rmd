@@ -1,439 +1,601 @@
 ---
-title: "ResistanceGA2: Terra-Based Workflows"
+title: "ResistanceGA2: Full Optimization Workflow"
 author: "Bill Peterman"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: false
 vignette: |
-  %\VignetteIndexEntry{ResistanceGA2: Terra-Based Workflows}
+  %\VignetteIndexEntry{ResistanceGA2: Full Optimization Workflow}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 5,
+  message  = FALSE,
+  warning  = FALSE
+)
 ```
 
-```{r libraries, message=FALSE, warning=FALSE}
+```{r libraries}
 library(ResistanceGA2)
 library(terra)
+library(ggplot2)
 ```
+
+---
 
 # Background
 
-`ResistanceGA2` is the terra-based continuation of the original
-`ResistanceGA` framework for optimizing resistance surfaces with genetic
-algorithms. The core idea is unchanged from the approach first laid out in
-Peterman et al. (2014) and later formalized for the package in Peterman
-(2018): rather than assigning resistance values entirely from expert opinion
-or searching only a small grid of candidate values, the package uses
-stochastic optimization to search a much broader parameter space and identify
-surfaces that best explain pairwise genetic differentiation.
+## Resistance Modeling in Landscape Genetics
 
-That framework is useful for continuous surfaces, categorical surfaces, and
-multiple-surface hypotheses. Continuous layers can be transformed through
-parameterized response curves, categorical layers can have class-specific
-resistance values estimated, and multisurface models can combine several
-hypothesized drivers into a single composite surface. The current package keeps
-that modeling framework but modernizes the implementation so that the package 
-uses `terra`, Circuitscape is run through Julia with `JuliaConnectoR`, and
-`gdistance` remains available through internal raster conversion.
+The central question in landscape genetics is deceptively simple: why do some pairs of populations exchange genes more readily than others? Geography matters — nearby populations tend to be more similar — but geography is rarely the whole story. The landscape between populations shapes movement, and movement shapes gene flow. A river, a road, a ridge line, or simply an expanse of unsuitable habitat can reduce effective connectivity far below what geographic distance alone would predict.
 
-Resistance distances can now be calculated in two main ways. `gdistance`
-supports least-cost path distances with `costDistance()` and random-walk
-commute-time distances with `commuteDistance()`. Julia/Circuitscape provides
-pairwise resistance distances and current maps. In practice, `gdistance` is
-often the most convenient starting point for iterative optimization because it
-stays inside R and is usually faster for repeated model fitting, while
-Julia/Circuitscape remains essential when you need direct Circuitscape output
-or cumulative current maps.
+Quantifying that connectivity requires a *resistance surface*: a raster in which each cell value represents the cost of moving through that location. Low resistance values allow easy passage; high resistance values impede movement. By accumulating resistance across paths between locations, we obtain pairwise *effective distances* that can be compared against observed genetic differentiation.
 
-This is still a model-based and computationally intensive workflow. Runtime
-depends on raster size, number of sample locations, number of surfaces,
-transformation space, and optimizer settings. You must think carefully about 
-biological realism, raster resolution, and sampling design before launching 
-large search spaces. If you plan to interpret resistance distances or current 
-flow biologically, it is worth also reading the broader resistance-modeling and
-circuit-theory literature rather than treating the package as a black box.
+The problem is that resistance values are not directly observable. Ecologists and geneticists have traditionally assigned them from expert opinion or tested a small discrete set of candidate values. `ResistanceGA2` replaces that approach with **stochastic optimization**: a genetic algorithm searches the parameter space and identifies the resistance parameterization that best explains the observed pattern of pairwise genetic distances, as judged by the fit of a Maximum Likelihood Population Effects (MLPE) mixed model.
 
-The practical interface in `ResistanceGA2` is simpler than the legacy package.
+## The Genetic Algorithm Approach
 
-- Resistance surfaces should be supplied as `SpatRaster` objects.
-- Sample locations should be supplied as point `SpatVector` objects.
-- `gdistance` is still supported, but raster conversion happens internally.
-- Circuitscape is supported through Julia and `JuliaConnectoR`, not through the standalone `.exe`.
-- The old kernel-smoothing / `kernel.scale` workflow has been removed.
+The genetic algorithm (GA) is a metaheuristic that mimics natural selection over a population of candidate solutions. In each generation:
 
-This vignette focuses on the current package framework rather than the legacy
-file-based workflow.
+1. Every candidate parameter set is used to transform the input raster into a resistance surface.
+2. Pairwise effective distances are computed from that surface (via `gdistance` or Julia/Circuitscape).
+3. An MLPE model is fit with those distances as the predictor of pairwise genetic distance.
+4. The objective function — by default, log-likelihood — is returned as the "fitness" of that candidate.
+5. High-fitness candidates are selected, recombined, and mutated to form the next generation.
+
+This process repeats until the population converges or a stopping criterion is met (maximum iterations, or a run of generations with no improvement). The result is the parameter set — transformation shape, maximum resistance, and/or class-specific values — that maximizes the explanatory power of the resistance surface for the genetic data at hand.
+
+## The MLPE Framework
+
+Standard regression models cannot be applied directly to pairwise genetic and landscape distance data because observations sharing a common sampling location are not independent — any pair involving population A is correlated with any other pair involving population A. The MLPE model (Clarke et al. 2002) handles this by including a random effect structured to absorb that dependency:
+
+```
+genetic_distance ~ resistance_distance + (1 | pop)
+```
+
+The random effect `pop` is derived from `To.From.ID()`, which generates the population-level grouping structure from the pairwise observation indices. The `ZZ` matrix that defines the MLPE random effect structure is created internally; users do not need to construct it manually when using `SS_optim()`, `MS_optim()`, or `all_comb()`. When using `mlpe_rga()` directly, `ZZ` is also created automatically from the number of rows in the data frame.
+
+---
 
 # Thoughts on Optimization
 
-There are three objective functions available in `GA.prep()`: `"AIC"`,
-`"R2"`, and `"LL"`. The default in `ResistanceGA2` is still log-likelihood
-(`method = "LL"`), and that is usually the best place to start. `R2` is
-intuitive, but in practice it is often not sensitive enough to provide a clean
-objective surface for the genetic algorithm. Recent simulations have also called into question the use of R-squared (Beninde et al. 2024, Molec Eco Res). AIC- and AICc-based criteria can
-still be useful for comparing fitted models, but they depend on assumptions
-about effective sample size and model complexity that are not fully
-straightforward for pairwise MLPE models.
+Before launching a GA search, it is worth thinking carefully about the choices that determine what the search is actually optimizing.
 
-That ambiguity matters most when deciding how to count `k`, the number of
-parameters used in AIC/AICc calculations. The fitted MLPE model always contains
-a single fixed-effect resistance term, but the resistance distances themselves
-may have been produced by optimizing several underlying parameters. Continuous
-surfaces estimate a transformation family plus shape and maximum resistance;
-categorical surfaces estimate multiple class-specific values; multisurface
-models combine information from several layers into a single composite
-predictor. Because of that, there is no universally accepted way to count `k`
-in this setting.
+## Choosing an Objective Function
 
-`ResistanceGA2` keeps that uncertainty explicit by allowing `k.value` to
-control how model complexity is counted. Different defensible choices can lead
-to different AIC/AICc penalties, so users should report which option they used
-and why. The default `k.value = 2` is a practical starting point, but it
-should not be treated as uniquely correct for every study design.
+Three objective functions are available via `GA.prep(method = ...)`:
 
-A useful general strategy is to begin with simpler, biologically plausible
-hypotheses and only expand the search space when the data and system justify
-it. Repeated runs should recover broadly similar results if the signal is
-strong. It is also highly recommended that continuous transformations be
-restricted to the Monomolecular families unless there is a strong biological or
-ecological reason to expect a unimodal or quadratic-type relationship. Ricker
-transformations are more flexible, but that flexibility also increases the risk
-of overfitting.
+- **`"LL"` (default):** Maximize the log-likelihood of the MLPE model. This is the recommended starting point. LL is a direct measure of model fit and provides a clean, sensitive objective surface for the GA.
+- **`"AIC"`:** Minimize AIC. Penalizes model complexity, but the penalty depends on `k.value` — see below.
+- **`"R2"`:** Maximize marginal R^2^ of the MLPE model. Intuitive, but simulation studies have shown R^2^ to be a less sensitive and less reliable guide for the GA than LL (Beninde et al. 2024). This option is retained for backward compatibility but is not recommended as a primary search objective.
 
-When choosing between distance engines, `gdistance::commuteDistance()` is often
-a good default for iterative model fitting because it captures the same
-random-walk style logic as Circuitscape resistance distance while remaining
-fast and easy to run inside R. Julia/Circuitscape is still valuable when you
-need direct Circuitscape outputs, want to produce current maps, or need to
-match an existing Circuitscape-based workflow more closely. In either case, it
-is best to treat optimization as one step in a broader inference process rather
-than as a fully automated truth-finding procedure.
+Regardless of which objective drives the GA, the output always includes AIC, AICc, R^2^~m~, R^2^~c~, and LL for all fitted models so that you can compare results on multiple criteria after the search.
 
-# Example Data
+## Counting Parameters: k.value
 
-The package includes example resistance surfaces, sample locations, and genetic-distance matrices.
+AIC and AICc require knowing the number of free parameters `k` in the model. For a standard linear model, this is straightforward. For a pairwise MLPE model fitted to distances that were themselves produced by optimizing several underlying parameters, the answer is less clear.
+
+`ResistanceGA2` exposes four counting rules via `k.value` in `GA.prep()`:
+
+| k.value | Rule |
+|---|---|
+| 1 | Parameters from the fitted MLPE model only (intercept + variance components) |
+| 2 | MLPE parameters + intercept (default) |
+| 3 | MLPE parameters + number of surface layers + intercept |
+| 4 | Number of surfaces + intercept (ignores MLPE variance components) |
+
+There is no universally correct choice. `k.value = 2` is a practical starting point, but you should report which option you used and be consistent across all models in a comparison. Using different `k.value` settings for different models in the same study is not valid.
+
+## Transformation Families
+
+For continuous surfaces, the GA searches a two-dimensional space: the shape parameter and the maximum resistance parameter of a chosen transformation family. The choice of transformation families to include in the search is controlled by `select.trans` in `GA.prep()`.
+
+The default behavior includes all Monomolecular families (`"M"`) for continuous layers and assigns `NA` (no transformation, class-specific values) for categorical layers. Adding Ricker families (`"A"` for all, or `"R"` for Ricker only) increases search space and flexibility but also increases the risk of overfitting — Ricker curves can approximate almost any monotone shape when the shape parameter is extreme, at the cost of less interpretable parameters.
+
+> **Recommendation:** Start with `select.trans = list("M")` for continuous layers. Only include Ricker families if you have a biological hypothesis about a peaked or threshold-type resistance response. See the `Surface_Transformations` vignette for a detailed discussion.
+
+---
+
+# Example Data and Preparation
+
+## The Dataset
+
+This vignette uses the `raster_orig` surface and the `sample_pops`/`Dc_list` data for code demonstrations, and the precomputed results stored in `inst/extdata/vignette-results/` for all displayed outputs. This keeps render time short while showing realistic results from a properly parameterized run.
 
 ```{r example-data}
-pts <- vect(sample_pops[[1]], type = "points")
-gd <- lower(Dc_list[[1]])
-pts_small <- vect(samples[, 2:3], type = "points")
+# Larger dataset suitable for full optimization
+pts  <- vect(sample_pops[[1]], type = "points")
+gd   <- lower(Dc_list[[1]])
 
 pts
-pts_small
 raster_orig
+
+# Summary statistics of the genetic distance vector
+summary(gd)
 ```
 
-`sample_pops` is stored as coordinate matrices for convenience, but the current workflow converts those coordinates to `SpatVector` objects before analysis.
+```{r plot-data, fig.cap="Continuous resistance surface with sample population locations (white dots). This is the surface to be optimized."}
+plot(raster_orig[["cont_orig"]], main = "Continuous resistance surface")
+points(pts, pch = 19, col = "white", cex = 0.8)
+points(pts, pch = 1,  col = "black", cex = 0.8)
+```
 
-For the expensive distance-engine examples below, this vignette uses packaged,
-precomputed outputs generated from the smaller `samples` point set and the
-`resistance_surfaces[["continuous"]]` layer. That keeps the vignette fast to
-render and avoids requiring Julia during documentation builds. The builder
-script used to refresh those objects lives in `data-raw/build_vignette_outputs.R`.
+## Preparing GA Settings
 
-# Prepare Optimization Inputs
-
-## Genetic Algorithm Settings
-
-`GA.prep()` now expects a `SpatRaster` supplied through the `raster` argument.
-
-For continuous surfaces, the recommended default is to restrict transformation
-searches to the Monomolecular families. Ricker families should usually only be
-explored when there is a strong biological or ecological basis for a unimodal
-or quadratic-type relationship; otherwise, their added flexibility can increase
-the risk of overfitting.
-
-```{r ga-prep, message=FALSE, warning=FALSE}
+```{r ga-prep}
 ga_inputs <- GA.prep(
-  raster = raster_orig,
-  Results.dir = file.path(tempdir(), "ResistanceGA2-vignette"),
-  monitor = FALSE,
-  quiet = TRUE
+  raster      = raster_orig,
+  Results.dir = file.path(tempdir(), "ResistanceGA2-tutorial"),
+  method      = "LL",
+  pop.size    = 25,
+  maxiter     = 200,
+  run         = 25,
+  monitor     = FALSE,
+  quiet       = TRUE
 )
 
 ga_inputs$layer.names
 ga_inputs$surface.type
+ga_inputs$select.trans
 ```
 
-In practice, this means many analyses should keep `select.trans` at its default
-Monomolecular-only behavior or specify `list("M", ...)` explicitly for
-continuous layers.
+The `select.trans` component shows which transformation families will be searched for each layer. For continuous layers, the default is `"M"` (Monomolecular families). You can override this:
 
-## Pairwise Distances with gdistance
-
-Use `gdist.prep()` when you want to optimize against least-cost or commute-time distances.
-
-```{r gdist-prep, warning=FALSE}
-gdist_demo_inputs <- gdist.prep(
-  n.Pops = nrow(samples),
-  samples = pts_small,
-  method = "costDistance"
+```{r ga-prep-custom, eval=FALSE}
+# Include all transformation families for a more exhaustive search
+ga_inputs_full <- GA.prep(
+  raster       = raster_orig,
+  Results.dir  = file.path(tempdir(), "ResistanceGA2-tutorial-full"),
+  select.trans = list("A"),   # "A" = all 8 families
+  pop.size     = 50,
+  maxiter      = 500,
+  run          = 50,
+  monitor      = FALSE,
+  quiet        = TRUE
 )
 
-names(gdist_demo_inputs)
-```
-
-You can also calculate a distance matrix directly from a resistance surface.
-The matrix shown here is precomputed and shipped with the package.
-
-```{r run-gdistance}
-cd_matrix <- vignette_pairwise_outputs$gdistance_commute
-
-dim(cd_matrix)
-```
-
-To reproduce that object manually:
-
-```{r run-gdistance-live, eval=FALSE}
-cd_matrix <- Run_gdistance(
-  gdist.inputs = gdist_demo_inputs,
-  r = resistance_surfaces[["continuous"]]
+# Restrict to Monomolecular only (recommended default)
+ga_inputs_mono <- GA.prep(
+  raster       = raster_orig,
+  Results.dir  = file.path(tempdir(), "ResistanceGA2-tutorial-mono"),
+  select.trans = list("M"),   # "M" = Monomolecular families only
+  pop.size     = 50,
+  maxiter      = 500,
+  run          = 50,
+  monitor      = FALSE,
+  quiet        = TRUE
 )
 ```
 
-## Pairwise Distances with Circuitscape in Julia
+## Preparing gdistance Inputs
 
-Use `jl.prep()` when you want to run Circuitscape through Julia. This requires a working Julia installation plus the `Circuitscape` Julia package.
-
-```{r jl-prep, eval=FALSE}
-jl_inputs <- jl.prep(
-  n.Pops = nrow(samples),
-  CS_Point.File = pts_small,
-  JULIA_HOME = Sys.getenv("JULIA_BINDIR"),
-  run_test = FALSE
+```{r gdist-prep}
+gdist_inputs <- gdist.prep(
+  n.Pops   = nrow(sample_pops[[1]]),
+  response = gd,
+  samples  = pts,
+  method   = "costDistance"
 )
+
+names(gdist_inputs)
 ```
 
-The packaged vignette outputs also include a precomputed pairwise Circuitscape
-result generated from the same surface and sample locations.
+The `response` argument is the vector of pairwise genetic distances obtained from `lower()` applied to a square distance matrix. Including it here links the MLPE model to the genetic data during optimization.
 
-```{r jl-precomputed}
-cs_result <- vignette_pairwise_outputs$circuitscape_matrix
+> **Note:** If you want to use Circuitscape instead of `gdistance`, replace `gdist.prep()` with `jl.prep()` and pass `jl.inputs` instead of `gdist.inputs` to all downstream functions. The interface is otherwise identical. See the `Julia_Guide` vignette.
 
-length(cs_result)
-head(cs_result)
-```
+---
 
-# Optimization Workflows
+# Single-Surface Optimization
 
-## Single-Surface Optimization
+## Running SS_optim
 
-```{r ss-optim, eval=FALSE}
+`SS_optim()` fits one GA optimization per surface layer, plus optional null (intercept-only) and distance (IBD) reference models. Each surface is optimized independently.
+
+```{r ss-optim-code, eval=FALSE}
 ss_out <- SS_optim(
-  gdist.inputs = gdist_inputs,
-  GA.inputs = ga_inputs,
-  dist_mod = FALSE,
-  null_mod = FALSE,
-  diagnostic_plots = FALSE
+  gdist.inputs     = gdist_inputs,
+  GA.inputs        = ga_inputs,
+  dist_mod         = TRUE,    # include IBD model in comparison
+  null_mod         = TRUE,    # include null model in comparison
+  diagnostic_plots = TRUE     # generate residual and QQ plots
 )
 ```
 
-## Multi-Surface Optimization
+This is computationally expensive for large rasters or many sample locations. The code above is shown for reference; the results below are loaded from a precomputed file.
 
-```{r ms-optim, eval=FALSE}
+## Loading and Displaying Results
+
+```{r ss-results-load}
+ss_rds <- system.file(
+  "extdata/vignette-results/ss_optim_results.rds",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(ss_rds)) {
+  ss_out <- readRDS(ss_rds)
+} else {
+  message("Precomputed SS results not found. Run data-raw/generate_optimization_results.R first.")
+  ss_out <- NULL
+}
+```
+
+```{r ss-aic-table, eval=!is.null(ss_out)}
+knitr::kable(
+  ss_out$AICc,
+  digits  = 3,
+  caption = "Single-surface model comparison. Lower AICc = better fit. LL = log-likelihood. R2m = marginal R-squared. k = number of parameters."
+)
+```
+
+The AICc table compares all surfaces tested plus the null and distance reference models. Columns:
+
+- **AIC / AICc**: Akaike Information Criteria (corrected for small samples). Lower = better.
+- **R2m**: Marginal R^2^ — variance explained by fixed effects (resistance distance) alone.
+- **R2c**: Conditional R^2^ — variance explained by fixed + random effects combined.
+- **LL**: Log-likelihood. Higher = better fit.
+- **k**: Number of parameters counted (governed by `k.value` in `GA.prep()`).
+
+## Recovered Transformation Parameters
+
+```{r ss-cont-results, eval=!is.null(ss_out)}
+if (!is.null(ss_out$ContinuousResults)) {
+  knitr::kable(
+    ss_out$ContinuousResults,
+    digits  = 3,
+    caption = "Optimized transformation parameters for continuous surfaces."
+  )
+}
+```
+
+For each continuous surface, the GA returns:
+
+- **Transformation**: Which of the 8 transformation families was selected.
+- **shape**: The curvature parameter. Controls how steeply the curve accelerates.
+- **max**: The maximum resistance value. Controls the amplitude of the transformation.
+- **LL / AICc**: Model fit metrics for this surface's best parameter set.
+
+For categorical surfaces, class-specific resistance values are returned in `$CategoricalResults`.
+
+## Interpreting SS_optim Output
+
+The single-surface results tell you, for each landscape variable tested in isolation, how much explanatory power it contributes to pairwise genetic distances. A surface with a substantially lower AICc than the null model is worth investigating further. A surface that does not improve on the null — or that is outperformed by the simple geographic distance (IBD) model — may not be an important driver of genetic structure for this system.
+
+Key interpretation points:
+
+1. **Compare against the null model first.** If the best resistance surface barely improves on the null, either the landscape features tested are not driving connectivity or the genetic data lack sufficient signal.
+
+2. **Compare against the IBD model.** If a resistance surface outperforms geographic distance, that surface captures structure beyond simple isolation by distance.
+
+3. **Look at R^2^~m~ in absolute terms.** An improvement in AICc can be small in absolute fit terms. R^2^~m~ gives you a sense of how much genetic variance is actually accounted for.
+
+4. **Do not over-interpret single-surface results.** In real systems, multiple features usually contribute simultaneously. Multi-surface optimization (below) tests whether combining surfaces improves on the best individual surface.
+
+> **Warning:** A surface that ranks first in single-surface analysis is not guaranteed to be the most important driver in a multi-surface analysis. Variables can have correlated effects, and their relative importance may shift when optimized jointly.
+
+---
+
+# Multi-Surface Optimization
+
+## Running MS_optim
+
+`MS_optim()` simultaneously optimizes the transformation parameters for all surface layers and estimates their relative contributions to a single composite resistance surface. The composite is a weighted linear combination:
+
+```
+composite_resistance = w1 * surface1_transformed + w2 * surface2_transformed + ...
+```
+
+where the weights (contributions) are also estimated by the GA.
+
+```{r ms-optim-code, eval=FALSE}
 ms_out <- MS_optim(
-  gdist.inputs = gdist_inputs,
-  GA.inputs = ga_inputs,
-  diagnostic_plots = FALSE
+  gdist.inputs     = gdist_inputs,
+  GA.inputs        = ga_inputs,
+  diagnostic_plots = TRUE
 )
 ```
 
-If you want to reconstruct the optimized composite surface after a multisurface run:
+## Loading Multi-Surface Results
 
-```{r combine-surfaces, eval=FALSE}
-combined_surface <- Combine_Surfaces(
-  PARM = ms_out$GA.summary@solution[1, ],
-  gdist.inputs = gdist_inputs,
-  GA.inputs = ga_inputs
+```{r ms-results-load}
+ms_rds <- system.file(
+  "extdata/vignette-results/ms_optim_results.rds",
+  package = "ResistanceGA2"
+)
+
+if (file.exists(ms_rds)) {
+  ms_out <- readRDS(ms_rds)
+} else {
+  message("Precomputed MS results not found. Run data-raw/generate_optimization_results.R first.")
+  ms_out <- NULL
+}
+```
+
+```{r ms-aic-table, eval=!is.null(ms_out)}
+knitr::kable(
+  ms_out$AICc,
+  digits  = 3,
+  caption = "Multi-surface model comparison."
 )
 ```
 
-## All-Combinations Analysis
+## Percent Contribution
 
-For `all_comb()`, create the GA settings with `Results.dir = "all.comb"` and provide a separate directory where outputs should be written. That output directory will be created automatically when needed.
+```{r ms-contribution, eval=!is.null(ms_out)}
+if (!is.null(ms_out$percent.contribution)) {
+  # percent.contribution is a data frame with columns: surface, mean
+  pct <- ms_out$percent.contribution
+  pct$mean <- round(pct$mean * 100, 1)  # convert to percentage
+  names(pct) <- c("Surface", "Contribution (%)")
+  knitr::kable(
+    pct,
+    caption = "Percent contribution of each surface to the composite resistance model.",
+    row.names = FALSE
+  )
+}
+```
 
-```{r all-comb, eval=FALSE}
+Percent contribution reflects the relative weight of each surface in the optimized composite. A surface with 70% contribution dominates the composite; a surface with 5% contribution has little influence. However, note that these percentages are sensitive to scaling and the correlation structure among surfaces. They should be interpreted as a rough guide to relative importance, not as precise effect sizes.
+
+## Reconstructing the Composite Surface
+
+After a multi-surface optimization, you can reconstruct the optimized composite surface for visualization or downstream analysis:
+
+```{r combine-surfaces-code, eval=FALSE}
+composite <- Combine_Surfaces(
+  PARM         = ms_out$GA.summary@solution[1, ],
+  gdist.inputs = gdist_inputs,
+  GA.inputs    = ga_inputs,
+  rescale      = TRUE
+)
+
+plot(composite, main = "Optimized composite resistance surface")
+```
+
+`Combine_Surfaces()` applies the optimal transformations to each layer and combines them with the optimal weights. Setting `rescale = TRUE` scales the composite to the range [1, 10].
+
+---
+
+# All-Combinations Analysis
+
+## When to Use all_comb
+
+`all_comb()` is useful when you have multiple candidate surfaces and want to systematically evaluate all possible combinations up to a specified size. Rather than choosing between single-surface and multi-surface analyses, you test every subset: surface A alone, surface B alone, A+B together, A+C together, and so on.
+
+This is more thorough than running `SS_optim()` and `MS_optim()` separately, because it evaluates partial combinations that neither function covers.
+
+## Setting Up all_comb
+
+`all_comb()` requires `Results.dir = "all.comb"` in the `GA.prep()` call. A separate `results.dir` argument specifies where all-combinations outputs are written.
+
+```{r all-comb-code, eval=FALSE}
+# GA settings must use Results.dir = "all.comb"
 ga_allcomb <- GA.prep(
-  raster = raster_orig,
+  raster      = raster_orig,
   Results.dir = "all.comb",
-  monitor = FALSE,
-  quiet = TRUE
+  pop.size    = 25,
+  maxiter     = 200,
+  run         = 25,
+  monitor     = FALSE,
+  quiet       = TRUE
 )
 
 results_dir <- file.path(tempdir(), "ResistanceGA2-all-comb")
 
 combo_out <- all_comb(
-  gdist.inputs = gdist_inputs,
-  GA.inputs = ga_allcomb,
-  results.dir = results_dir,
-  max.combination = 2,
-  iters = 10,
-  replicate = 1
+  gdist.inputs     = gdist_inputs,
+  GA.inputs        = ga_allcomb,
+  results.dir      = results_dir,
+  max.combination  = 2,   # test 1- and 2-surface combinations
+  iters            = 500, # bootstrap iterations
+  replicate        = 1    # GA replicates per combination
 )
 ```
 
-# Working with Transformations
+## Loading all_comb Results
 
-The package still provides the transformation utilities used during
-optimization. These are useful for inspecting the shape of hypothesized
-relationships before running a full search.
-
-The figure below recreates the eight non-flat transformation families using a
-common illustrative parameter set (`shape = 2.5`, `max = 100`) across the
-range of the example continuous surface. The goal is to show the geometry of
-the available curve families, not to imply that these are the parameter values
-that should be used in an analysis. The flat Distance transformation is not
-shown because it simply assigns a constant resistance of 1 everywhere.
-
-```{r transformation-families, fig.width=12, fig.height=7, fig.cap="Illustrative transformation families available for continuous resistance surfaces. All panels use the same shape and maximum parameters to emphasize differences in curve geometry."}
-scale_vector <- function(x, min_out, max_out) {
-  ((x - min(x)) * (max_out - min_out) / (max(x) - min(x))) + min_out
-}
-
-transform_curve <- function(transformation, x, shape, max_value) {
-  if (transformation == "Inverse-Reverse Monomolecular") {
-    y <- -max_value * (1 - exp(-x / shape)) - 1
-    rev(scale_vector(y, abs(max(y)), abs(min(y))))
-  } else if (transformation == "Inverse-Reverse Ricker") {
-    y <- -(max_value * x * exp(-x / shape)) - 1
-    rev(scale_vector(y, abs(max(y)), abs(min(y))))
-  } else if (transformation == "Monomolecular") {
-    max_value * (1 - exp(-x / shape)) + 1
-  } else if (transformation == "Ricker") {
-    max_value * x * exp(-x / shape) + 1
-  } else if (transformation == "Reverse Monomolecular") {
-    y <- max_value * (1 - exp(-x / shape)) + 1
-    rev(y)
-  } else if (transformation == "Reverse Ricker") {
-    y <- max_value * x * exp(-x / shape) + 1
-    rev(y)
-  } else if (transformation == "Inverse Monomolecular") {
-    y <- -max_value * (1 - exp(-x / shape)) - 1
-    scale_vector(y, abs(max(y)), abs(min(y)))
-  } else if (transformation == "Inverse Ricker") {
-    y <- -(max_value * x * exp(-x / shape)) - 1
-    scale_vector(y, abs(max(y)), abs(min(y)))
-  } else {
-    stop("Unknown transformation: ", transformation)
-  }
-}
-
-curve_names <- c(
-  "Inverse-Reverse Monomolecular",
-  "Inverse-Reverse Ricker",
-  "Monomolecular",
-  "Ricker",
-  "Reverse Monomolecular",
-  "Reverse Ricker",
-  "Inverse Monomolecular",
-  "Inverse Ricker"
+```{r allcomb-results-load}
+ac_rds <- system.file(
+  "extdata/vignette-results/all_comb_results.rds",
+  package = "ResistanceGA2"
 )
 
-curve_params <- list(shape = 2.5, max_value = 100)
-range_stats <- terra::global(raster_orig[["cont_orig"]], c("min", "max"), na.rm = TRUE)
-original_values <- seq(range_stats$min, range_stats$max, length.out = 200)
-scaled_values <- scale_vector(original_values, 0, 10)
+if (file.exists(ac_rds)) {
+  combo_out <- readRDS(ac_rds)
+} else {
+  message("Precomputed all_comb results not found.")
+  combo_out <- NULL
+}
+```
 
-curve_data <- do.call(
-  rbind,
-  lapply(curve_names, function(name) {
-    data.frame(
-      original = original_values,
-      transformed = transform_curve(
-        transformation = name,
-        x = scaled_values,
-        shape = curve_params$shape,
-        max_value = curve_params$max_value
-      ),
-      transformation = name
-    )
-  })
-)
-
-curve_data$transformation <- factor(curve_data$transformation, levels = curve_names)
-
-ggplot2::ggplot(curve_data, ggplot2::aes(x = original, y = transformed)) +
-  ggplot2::geom_line(linewidth = 0.9) +
-  ggplot2::facet_wrap(~ transformation, ncol = 4, scales = "free_y") +
-  ggplot2::theme_bw() +
-  ggplot2::labs(
-    x = "Original data values",
-    y = "Transformed resistance values"
-  ) +
-  ggplot2::theme(
-    strip.text = ggplot2::element_text(face = "bold", size = 9),
-    axis.text = ggplot2::element_text(size = 9),
-    axis.title = ggplot2::element_text(size = 10)
+```{r allcomb-table, eval=!is.null(combo_out)}
+if (!is.null(combo_out$summary.table)) {
+  knitr::kable(
+    combo_out$summary.table,
+    digits  = 3,
+    caption = "All-combinations summary table. Rows are surface combinations ranked by AICc."
   )
+}
 ```
 
-Monomolecular families are usually the best default because they are easier to
-interpret and generally less prone to overfitting. Ricker families are helpful
-when there is a strong biological reason to expect a peak or threshold-like
-response, but they should usually be explored more cautiously. During
-optimization, very large shape values for Ricker-family transformations are
-collapsed to the flat Distance solution, because those curves can otherwise
-approximate monomolecular behavior while adding unnecessary flexibility.
+---
 
-```{r plot-trans}
-Plot.trans(
-  PARM = c(2.5, 100),
-  Resistance = raster_orig[["cont_orig"]],
-  transformation = "Monomolecular",
-  marginal.plot = FALSE
+# Bootstrap Analysis
+
+## Why Bootstrap?
+
+Single-run optimization results depend on the stochastic nature of the GA and the composition of the specific sample. Bootstrap resampling (Resist.boot()) asks: how consistently does each surface combination rank highly across many subsamples of the pairwise data? A surface that ranks first in 90% of bootstrap replicates provides much stronger support than one that ranks first only 55% of the time.
+
+## Running Resist.boot
+
+`Resist.boot()` resamples the pairwise observations to assess how consistently each surface ranks highly across subsampled datasets. When you use `all_comb()`, bootstrap is run automatically and the results are stored in `combo_out$boot.results` — you do not need to call `Resist.boot()` separately.
+
+If you want to run bootstrap directly after `SS_optim()` and `MS_optim()` (without `all_comb()`), you must build the distance matrix list and k vector from those outputs:
+
+```{r boot-code, eval=FALSE}
+# Collect distance matrices and k values from SS and MS runs
+mat_list <- c(ss_out$cd, list(ms_out$cd))
+k_vec    <- c(ss_out$k[, 2], nrow(ms_out$k))  # k per model
+names(mat_list) <- c(names(ss_out$cd), "multi_surface")
+
+# Build square genetic distance matrix (required by Resist.boot)
+n_pops <- gdist_inputs$n.Pops
+gd_mat <- matrix(0, n_pops, n_pops)
+gd_mat[lower.tri(gd_mat)] <- gdist_inputs$response
+
+boot_out <- Resist.boot(
+  mod.names    = names(mat_list),
+  dist.mat     = mat_list,
+  n.parameters = k_vec,
+  sample.prop  = 0.75,
+  iters        = 1000,
+  obs          = n_pops,
+  genetic.mat  = gd_mat
 )
 ```
 
-You can also apply a transformation directly to a raster:
+> **Note:** `dist.mat` must be a named list of **square** pairwise distance matrices (one per model). `n.parameters` is a numeric vector with the parameter count for each model (the `k` column from `$k` in SS/MS output). `obs` is the number of sampling locations as an integer. `genetic.mat` is the square genetic distance matrix without row or column names.
 
-```{r resistance-tran}
-transformed_surface <- Resistance.tran(
-  transformation = "Monomolecular",
-  shape = 2.5,
-  max = 100,
-  r = raster_orig[["cont_orig"]]
+## Loading Bootstrap Results
+
+```{r boot-results-load}
+boot_rds <- system.file(
+  "extdata/vignette-results/boot_results.rds",
+  package = "ResistanceGA2"
 )
 
-transformed_surface
+if (file.exists(boot_rds)) {
+  boot_out <- readRDS(boot_rds)
+} else {
+  message("Precomputed bootstrap results not found.")
+  boot_out <- NULL
+}
 ```
 
-# Current Circuitscape Runs
-
-The current map shown below is precomputed and stored as package data so the
-vignette can render quickly and reproducibly.
-
-```{r current-map}
-vignette_current_map
-```
-
-To reproduce either the pairwise resistance distances or the current map
-directly from Julia:
-
-```{r run-julia, eval=FALSE}
-cs_result <- Run_CS.jl(
-  jl.inputs = jl_inputs,
-  r = resistance_surfaces[["continuous"]]
-)
-
-current_map <- Run_CS.jl(
-  jl.inputs = jl_inputs,
-  r = resistance_surfaces[["continuous"]],
-  CurrentMap = TRUE,
-  output = "raster",
-  EXPORT.dir = results_dir
+```{r boot-table, eval=!is.null(boot_out)}
+knitr::kable(
+  boot_out,
+  digits  = 3,
+  caption = "Bootstrap model support summary from Resist.boot()."
 )
 ```
 
-# Migration Notes
+## Interpreting Bootstrap Results
 
-The original `ResistanceGA` package relied on workflows that are no longer part of `ResistanceGA2`.
+The `Resist.boot()` output is a tibble with one row per surface combination. Key columns:
 
-- Do not pass directories of `.asc` files as user input.
-- Do not pass `sp` classes such as `SpatialPoints`.
-- Do not use `JuliaCall` or `XRJulia`.
-- Do not use the standalone Circuitscape executable.
-- Do not use the old smoothing workflow based on `scale = TRUE` or `k.smooth()`.
+| Column | Interpretation |
+|---|---|
+| `surface` | Surface combination label |
+| `avg.AICc` | Mean AICc across bootstrap replicates |
+| `avg.weight` | Mean AIC weight — ranges 0 to 1, higher = more support |
+| `avg.rank` | Mean rank across replicates (1 = best) |
+| `avg.R2m` | Mean marginal R^2^ |
+| `avg.LL` | Mean log-likelihood |
+| `Percent.top` | % of replicates where this surface ranked first |
+| `n` | Number of replicates included |
+| `k` | Parameter count |
 
-If you keep those changes in mind, the modern workflow is mostly a matter of preparing terra objects up front and choosing whether the distance engine should be `gdistance` or Julia/Circuitscape.
+**`Percent.top`** is usually the most informative column. A surface with `Percent.top` > 50% is the modal top model across bootstrap replicates. A surface with `avg.weight` substantially higher than all alternatives has consistently stronger support.
+
+> **Tip:** If no single surface achieves `Percent.top` > 50%, the data may not have sufficient power to distinguish among the candidate surfaces, or the top surfaces may all be plausible models (model uncertainty). In that case, multi-model inference (model averaging using AIC weights) is more appropriate than selecting a single best model.
+
+---
+
+# Comparing Single-Surface, Multi-Surface, and Null Models
+
+After running `SS_optim()`, `MS_optim()`, and optionally baseline IBD/null models, you can combine the AICc tables for a comprehensive comparison. The precomputed results below illustrate this workflow.
+
+```{r combined-comparison, eval=!is.null(ss_out) && !is.null(ms_out)}
+# Combine SS and MS AICc tables (both have the same column structure)
+if (!is.null(ss_out) && !is.null(ms_out)) {
+  all_results <- rbind(
+    ss_out$AICc,
+    ms_out$AICc[!rownames(ms_out$AICc) %in% rownames(ss_out$AICc), ]
+  )
+
+  # Sort by AICc
+  all_results <- all_results[order(all_results$AICc), ]
+
+  knitr::kable(
+    all_results,
+    digits  = 3,
+    caption = "Combined model comparison: single-surface and multi-surface results ranked by AICc."
+  )
+}
+```
+
+When interpreting the combined table:
+
+- **AICc differences (ΔAICc):** Models within 2 AICc units of the best model have substantial support. Models 4–7 units above the best have considerably less support. Models > 10 units above can generally be ruled out.
+- **Null model as a baseline:** If the best resistance model barely improves on the null, reconsider whether the landscape variables tested are meaningful drivers of connectivity.
+- **Multi-surface vs. single-surface:** If the multi-surface model substantially outperforms the best single-surface model, the composite landscape story is more informative than any single driver.
+
+---
+
+# Diagnostic Plots
+
+When `diagnostic_plots = TRUE`, `SS_optim()` and `MS_optim()` automatically generate and save:
+
+1. **Observed vs. predicted plot:** Genetic distance on the y-axis, resistance distance on the x-axis. A tight scatter around the regression line indicates good fit.
+2. **Residual plots:** Standardized residuals vs. fitted values. Patterns in residuals (curvature, funnel shapes) suggest model misspecification.
+3. **QQ plot:** Quantile–quantile plot of residuals against a normal distribution. Deviations suggest non-normality.
+4. **GA convergence plot:** Best fitness value per generation. A well-converged run shows a plateau at the end.
+
+You can also call `Diagnostic.Plots()` directly on any MLPE model object:
+
+```{r diag-plots-code, eval=FALSE}
+# Access fitted MLPE model from SS results
+mlpe_mod <- ss_out$MLPE.list[[1]]
+
+# Generate diagnostic plots
+Diagnostic.Plots(
+  resistance.mat = ss_out$cd[[1]],
+  genetic.mat    = as.matrix(dist(sample_pops[[1]])),
+  MLPE.list      = ss_out$MLPE.list,
+  plot.dir       = file.path(tempdir(), "diag-plots")
+)
+```
+
+---
+
+# Tips for Running Full Analyses
+
+**Set `parallel = TRUE`** in `GA.prep()` for any run with `pop.size > 20`. Parallel evaluation of the GA population provides substantial speedups on multi-core machines.
+
+**Start with small `pop.size` and `maxiter`** (e.g., 25 and 100) for workflow testing. Only increase to production settings (50–100 and 500–1000) for final analyses.
+
+**Run multiple replicates.** The `replicate` argument in `all_comb()` runs the GA multiple times per surface combination. If the best-fit parameters are consistent across replicates, the optimization has converged reliably.
+
+**Use `run` to control early stopping.** The `run` argument stops the GA after `run` consecutive generations with no improvement greater than `run.diff`. Setting `run = 50` and `maxiter = 1000` allows long searches but stops early when the solution has plateaued.
+
+**Save your Results.dir.** All tables and plots are written to `Results.dir` automatically. Keep this directory so you can review optimization trajectories and compare across parameter settings without re-running.
+
+**Consider resolution carefully.** Very high-resolution rasters dramatically increase computation time for each distance calculation. Consider aggregating to a coarser resolution for initial optimization, then refining at higher resolution for final analyses.
+
+> **Warning:** Do not use `maxiter = 10` or `run = 5` for publication-quality results. These settings are only appropriate for workflow testing. An inadequately converged GA can return suboptimal parameter estimates that appear definitive but are actually artifacts of premature stopping.
+
+---
+
+# References
+
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).
+
+Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. *Journal of Agricultural, Biological, and Environmental Statistics* 7:361–372.
+
+McRae, B. H. 2006. Isolation by resistance. *Evolution* 60:1551–1561.
+
+Peterman, W. E. 2018. ResistanceGA: An R package for the optimization of resistance surfaces using genetic algorithms. *Methods in Ecology and Evolution* 9:1638–1647.
+
+Peterman, W. E., G. M. Connette, R. D. Semlitsch, and L. S. Eggert. 2014. Ecological resistance surfaces predict fine-scale genetic differentiation in a terrestrial woodland salamander. *Molecular Ecology* 23:2402–2413.
+
+Row, J. R., J. F. Brawn, and P. J. Weatherhead. 2010. Isolation by resistance explains suckling behavior in a solitary rodent. *Ecology* 91:2002–2006.
