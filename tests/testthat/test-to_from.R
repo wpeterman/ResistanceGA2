@@ -39,7 +39,9 @@ test_that("To.From.ID stops when spLoc supplied without nb", {
 
 test_that("To.From.ID accepts SpatVector for spLoc", {
   spLoc <- terra::vect(cbind(c(1, 2, 9, 10), c(1, 2, 9, 10)), type = "points")
-  id <- To.From.ID(4, spLoc = spLoc, nb = 3)
+  id <- suppressWarnings(
+    To.From.ID(4, spLoc = spLoc, nb = 3)
+  )
   expect_named(id, c("pop1", "pop2", "corr_", "cor.grp"))
   expect_equal(nrow(id), 6L)
 })

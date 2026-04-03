@@ -12,7 +12,9 @@
 #' @param genetic.mat Genetic distance matrix without row or column names.
 #' @param keep Optional vector of pairwise observations to keep (1) or omit (0)
 #' @param n.cores Number of cores to use when running bootstrap in parallel. Default 2 less than total available.
-#' @return A data frame reporting the average model weight, average rank, number of times a model was the top model in the set, and the frequency a model was best.
+#' @return A data frame of class \code{resga_bootstrap} reporting the average
+#'   model weight, average rank, number of times a model was the top model in
+#'   the set, and the frequency a model was best.
 #' 
 #' @details This is a 'pseudo' bootstrap procedure that subsamples distance and genetic matrices, refits the MLPE model for each surface. AICc is calculated based on the number of parameters specified. Ranking of models during the bootstrap analysis is based on the specified \code{rank.method}, which defaults to 'AICc'. The objective of this procedure is to identify the surface that is top ranked across all bootstrap iterations.
 #' 
@@ -185,6 +187,7 @@ Resist.boot <-
     boot.avg[is.na(boot.avg)] <- 0
     # boot.avg <- as.data.frame(boot.avg)
     
+    boot.avg <- resga_add_class(boot.avg, "resga_bootstrap")
     return(boot.avg)
     
     options(warn = 0)

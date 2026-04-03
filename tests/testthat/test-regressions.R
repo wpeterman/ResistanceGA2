@@ -26,6 +26,13 @@ make_surface_stack_regression <- function() {
   out
 }
 
+with_test_plot_regression <- function(code) {
+  plot_file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(plot_file)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  force(code)
+}
+
 test_that("To.From.ID supports spatial expanded IDs when pop_n is supplied", {
   sp_loc <- terra::vect(cbind(c(1, 5, 10), c(1, 5, 10)), type = "points")
 
@@ -287,11 +294,18 @@ test_that("all_comb auto-creates and uses the requested results directory", {
   )
 
   expect_type(out, "list")
+  expect_s3_class(out, "resga_all_comb")
   expect_null(out$ss.results)
   expect_equal(out$all.k$surface, "categorical.continuous")
   expect_equal(names(out$all.cd), "categorical.continuous")
   expect_true(dir.exists(results_dir))
   expect_true(dir.exists(file.path(results_dir, "rep_1")))
+
+  out_summary <- summary(out)
+  expect_s3_class(out_summary, "summary.resga_all_comb")
+  expect_false(out_summary$replicated)
+
+  expect_no_error(with_test_plot_regression(plot(out)))
 })
 
 test_that("SS_optim handles standard continuous gdistance branch with distance and null models", {

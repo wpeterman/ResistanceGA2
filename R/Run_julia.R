@@ -46,6 +46,7 @@
 #' by Circuitscape are written to temporary files internally for each run.
 #'
 #' @export
+#' @importFrom utils capture.output
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples

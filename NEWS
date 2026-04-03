@@ -1,3 +1,14 @@
+ResistanceGA2 1.1.4
+---------
+* Integrated the dyad-aware MLPE interface and pairwise environmental helper workflow into main
+* Updated IBE/IBR and Julia vignettes for the new MLPE formulation and packed terra demo objects
+* Fixed Plot.trans duplicate plotting, Run_gdistance example behavior, and in-memory current-map returns
+
+ResistanceGA2 1.1.2
+---------
+* Fixed Windows parallel optimization for raster-based workflows
+* Added IBE/IBR vignette builder support for multi-core execution
+
 ResistanceGA2 1.1.1
 ---------
 * Expanded unit tests

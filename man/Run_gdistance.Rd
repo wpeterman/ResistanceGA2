@@ -37,14 +37,15 @@ the public API terra-based by coercing the supplied \code{SpatRaster}
 internally before building the transition object.
 }
 \examples{
-pts <- terra::vect(sample_pops[[1]], type = "points")
+pts <- terra::vect(samples[, 2:3], type = "points")
 gdist.inputs <- gdist.prep(
-  n.Pops = nrow(sample_pops[[1]]),
+  n.Pops = nrow(samples),
   samples = pts,
   method = "costDistance"
 )
 
-cd <- Run_gdistance(gdist.inputs, raster_orig[["cont_orig"]])
+r_surface <- terra::subset(terra::unwrap(resistance_surfaces), "continuous")
+cd <- Run_gdistance(gdist.inputs, r_surface)
 length(cd)
 }
 \author{

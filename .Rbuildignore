@@ -1,6 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.claude$
+^AGENTS\.md$
+^Rplots\.pdf$
 ^data-raw$
 ^doc$
 ^Meta$
+^inst/extdata/ibe-ibr-demo/(single_surface|multi_surface)$
+^inst/extdata/vignette-results/(Results|all_comb)$

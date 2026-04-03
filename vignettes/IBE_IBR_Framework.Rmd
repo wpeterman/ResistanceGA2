@@ -1,0 +1,730 @@
+---
+title: "Joint Isolation by Environment and Isolation by Resistance"
+author: "Bill Peterman"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: rmarkdown::html_vignette
+vignette: |
+  %\VignetteIndexEntry{Joint Isolation by Environment and Isolation by Resistance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(ResistanceGA2)
+library(terra)
+```
+
+```{r saved-output-flags, include=FALSE}
+output_dir <- system.file("extdata", "ibe-ibr-demo", package = "ResistanceGA2")
+
+if (!nzchar(output_dir)) {
+  local_extdata <- file.path("inst", "extdata", "ibe-ibr-demo")
+  if (dir.exists(local_extdata)) {
+    output_dir <- local_extdata
+  }
+}
+
+have_saved_outputs <- file.exists(file.path(output_dir, "analysis_summary.rds"))
+
+if (have_saved_outputs) {
+  summary_bundle <- readRDS(file.path(output_dir, "analysis_summary.rds"))
+  ss_out <- readRDS(file.path(output_dir, "single_surface_optim.rds"))
+  ms_out <- readRDS(file.path(output_dir, "multi_surface_optim.rds"))
+}
+```
+
+# Overview
+
+This vignette sketches a practical workflow for fitting isolation by
+environment (`IBE`) and isolation by resistance (`IBR`) concurrently with the
+new MLPE interface in `ResistanceGA2`.
+
+The central idea is simple:
+
+- `IBE` enters the model as one or more pairwise endpoint-difference
+  covariates.
+- `IBR` enters the model as the optimized resistance-distance term.
+- both are estimated in the same MLPE framework so we can ask whether one still
+  explains genetic differentiation after controlling for the other.
+
+This example uses the package's Idaho demo data:
+
+- `rga2_demo` for sites, extracted site environments, and the chord-distance matrix
+- `rga2_demo_covariates` for the raster layers used to generate resistance distances
+
+The analysis is structured so that the expensive optimization steps can be run
+outside the vignette, saved as package extdata, and then displayed here for
+later exploration.
+
+The document is organized in two layers:
+
+- a separate builder script that generates the full analysis objects and output files
+- this vignette, which then loads those saved results by default for display
+  and interpretation
+
+The optimization examples below use an explicit seed so the worked example is
+reproducible. The external builder script also supports named runtime profiles
+and an optional core-count override so you can choose between quick smoke tests
+and deeper optimization runs without editing the script itself.
+
+```{r output-note}
+if (!have_saved_outputs) {
+  cat(
+    "Saved analysis outputs were not found under ",
+    output_dir,
+    ".\n\nRun `data-raw/build_ibe_ibr_vignette_outputs.R` first if you want ",
+    "the full set of model tables, optimization summaries, and plots to be ",
+    "stored beneath `inst/extdata/ibe-ibr-demo/` and appear throughout this ",
+    "vignette.\n",
+    sep = ""
+  )
+}
+```
+
+# Design Choices
+
+For a joint `IBE`/`IBR` analysis, it is important not to blur the mechanism of
+endpoint mismatch with the mechanism of landscape permeability. In this example:
+
+- `IBE` is represented by site-level mismatch in `cti` and `hli`
+- `IBR` is optimized over the separate raster hypotheses `err27` and `ffp`
+- geographic distance is included as an additional covariate
+
+This is only one defensible partition. The key point is to avoid using the same
+variable in both roles unless that dual interpretation is explicitly part of
+the biological hypothesis.
+
+# Demo Data
+
+```{r demo-data}
+data(rga2_demo)
+data(rga2_demo_covariates)
+
+if (inherits(rga2_demo_covariates, "PackedSpatRaster")) {
+  rga2_demo_covariates <- unwrap(rga2_demo_covariates)
+}
+
+r_covariate <- subset(rga2_demo_covariates, c("err27", "ffp", "cti", "hli"))
+
+sites <- rga2_demo$sites
+site_env <- rga2_demo$site_environment
+
+sites[, c("demo_id", "SiteName", "x", "y")]
+site_env
+r_covariate
+```
+
+# Step 1: Build Pairwise Geographic and Environmental Covariates
+
+The pairwise response is the lower triangle of the 12 x 12 chord-distance
+matrix. We pair that response with:
+
+- Euclidean distance among sites (`IBD`)
+- pairwise endpoint differences in `cti` and `hli` (`IBE`)
+
+There are two common ways to encode `IBE`, and they answer slightly different
+questions.
+
+Absolute environmental differences:
+
+- use one pairwise covariate per environmental variable, such as
+  `|cti_i - cti_j|` or `|hli_i - hli_j|`
+- keep interpretation simple, because each coefficient refers to a specific
+  environmental mismatch axis
+- are the best starting point when you have a small set of clear, named
+  hypotheses
+
+Multivariate environmental distance:
+
+- compress several site-level variables into a single pairwise distance term
+- is useful when you want an overall environmental dissimilarity index rather
+  than separate coefficients
+- is harder to interpret mechanistically, because one coefficient summarizes
+  several variables at once
+
+In practice, I would usually start with absolute differences for a small number
+of biologically motivated variables, then compare that model to a simpler
+multivariate-distance version as a sensitivity check.
+
+That strategy is especially useful here because `cti` and `hli` have
+interpretable ecological meanings, while `env_dist` is intentionally more
+agnostic. Separate absolute-difference terms tell us which environmental axis
+is carrying signal; a multivariate distance tells us whether there is overall
+environmental mismatch even when we do not want to interpret individual axes
+too literally.
+
+```{r pairwise-covariates}
+site_ids <- sites$demo_id
+pair_index <- t(combn(site_ids, 2))
+pair_index <- data.frame(
+  from = pair_index[, 1],
+  to = pair_index[, 2],
+  stringsAsFactors = FALSE
+)
+
+coords <- rga2_demo$sample_coords
+geo <- as.numeric(scale(lower(as.matrix(dist(coords)))))
+
+ibe_diff <- site_pairwise_diff(
+  site_env[, c("cti", "hli")],
+  scale = TRUE
+)
+
+env_dist <- site_pairwise_dist(
+  site_env[, c("cti", "hli")],
+  scale = TRUE
+)
+
+head(ibe_diff)
+head(env_dist)
+```
+
+`ibe_diff` and `env_dist` are both valid `IBE` representations, but they should
+not usually be included in the same model because they encode overlapping
+information.
+
+# Step 1a: Check Predictor Overlap Before Fitting Models
+
+Before interpreting coefficients, it helps to inspect how strongly the pairwise
+predictors overlap. If `IBD`, `IBE`, and later `IBR` are all highly correlated,
+then model ranking may still be informative but individual fixed-effect
+estimates will be harder to interpret mechanistically.
+
+```{r predictor-correlation}
+predictor_cor <- cor(
+  data.frame(
+    geo = geo,
+    cti_diff = ibe_diff$cti_diff,
+    hli_diff = ibe_diff$hli_diff,
+    env_dist = env_dist$env_dist
+  )
+)
+
+round(predictor_cor, 3)
+```
+
+If you have already run the external builder script, the saved output bundle
+stores this same matrix for later review:
+
+```{r predictor-correlation-saved}
+if (have_saved_outputs) {
+  round(summary_bundle$predictor_correlation, 3)
+}
+```
+
+# Step 2: Fit Baseline MLPE Models Before Optimization
+
+Before optimizing any resistance surfaces, it is useful to ask whether there is
+support for `IBD`, `IBE`, or both.
+
+```{r baseline-pair-data}
+pair_data <- mlpe_data(
+  response = rga2_demo$genetic_vector,
+  pairs = pair_index,
+  geo = geo,
+  cti_diff = ibe_diff$cti_diff,
+  hli_diff = ibe_diff$hli_diff,
+  env_dist = env_dist$env_dist
+)
+
+head(pair_data)
+```
+
+# Optional: Multiple Dyadic Random Effects
+
+The examples above use one MLPE dyad term, `(1 | pair)`, where `pair` is built
+from the `from` and `to` site columns. The current `mlpe()` implementation can
+also include **more than one separate dyadic random-intercept term** in the same
+model, as long as each term is linked to its own pair of endpoint columns
+through the `pairs` argument.
+
+This can be useful when pairwise observations share endpoints at multiple
+sampling scales. For example, we may want one dyadic random effect for repeated
+use of the same sampled sites and a second dyadic random effect for repeated use
+of broader region labels attached to those sites.
+
+One current constraint is that each dyadic term still expects the two endpoint
+labels to differ within every row for that term. A coarse region-level dyadic
+effect therefore works naturally for **between-region** pairs, but not for
+within-region rows where `from_region == to_region`. The example below keeps
+only between-region observations so the two-term fit is well-defined.
+
+```{r multiple-dyad-terms}
+site_region <- setNames(
+  ifelse(sites$x <= stats::median(sites$x), "west", "east"),
+  as.character(sites$demo_id)
+)
+
+pair_data_region <- pair_data
+pair_data_region$from_region <- site_region[as.character(pair_data_region$from)]
+pair_data_region$to_region <- site_region[as.character(pair_data_region$to)]
+pair_data_region <- pair_data_region[
+  pair_data_region$from_region != pair_data_region$to_region,
+  ,
+  drop = FALSE
+]
+rownames(pair_data_region) <- NULL
+
+m_site_region <- mlpe(
+  response ~ geo + cti_diff + hli_diff +
+    (1 | site_pair) + (1 | region_pair),
+  data = pair_data_region,
+  pairs = list(
+    site_pair = c("from", "to"),
+    region_pair = c("from_region", "to_region")
+  )
+)
+
+summary(m_site_region)
+```
+
+The important distinction is that these are **parallel dyadic terms**, not a
+nested dyadic syntax. Formula shorthand such as `(1 | site_pair / region_pair)`
+is not currently translated into a nested MLPE covariance structure, and
+dyadic terms with same-label endpoints are still rejected. If you need both
+site-level and region-level dyadic effects right now, write them as separate
+terms and ensure the retained rows satisfy that endpoint-label constraint.
+
+```{r baseline-models, eval=FALSE}
+m_null <- mlpe(
+  response ~ 1 + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibd <- mlpe(
+  response ~ geo + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibe_cti <- mlpe(
+  response ~ cti_diff + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibe_hli <- mlpe(
+  response ~ hli_diff + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibe_both <- mlpe(
+  response ~ cti_diff + hli_diff + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibd_ibe <- mlpe(
+  response ~ geo + cti_diff + hli_diff + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+m_ibd_envdist <- mlpe(
+  response ~ geo + env_dist + (1 | pair),
+  data = pair_data,
+  pairs = c("from", "to")
+)
+
+baseline_table <- data.frame(
+  model = c(
+    "Null",
+    "IBD",
+    "IBE: cti",
+    "IBE: hli",
+    "IBE: cti + hli",
+    "IBD + IBE",
+    "IBD + env_dist"
+  ),
+  AIC = c(
+    AIC(m_null),
+    AIC(m_ibd),
+    AIC(m_ibe_cti),
+    AIC(m_ibe_hli),
+    AIC(m_ibe_both),
+    AIC(m_ibd_ibe),
+    AIC(m_ibd_envdist)
+  ),
+  logLik = c(
+    logLik(m_null),
+    logLik(m_ibd),
+    logLik(m_ibe_cti),
+    logLik(m_ibe_hli),
+    logLik(m_ibe_both),
+    logLik(m_ibd_ibe),
+    logLik(m_ibd_envdist)
+  )
+)
+
+baseline_table[order(baseline_table$AIC), ]
+```
+
+This baseline comparison tells us whether the environmental mismatch terms have
+signal before we add the path-based `IBR` component.
+
+The different baseline models answer different questions:
+
+- `Null` tells us how much structure is captured by the MLPE random effect alone
+- `IBD` asks whether simple geographic separation explains genetic distance
+- `IBE: cti` and `IBE: hli` isolate each environmental mismatch axis
+- `IBE: cti + hli` asks whether a small set of interpretable mismatch variables
+  improves fit together
+- `IBD + IBE` tests whether environmental mismatch adds anything after
+  accounting for geography
+- `IBD + env_dist` is a compact alternative when you prefer one overall
+  environmental dissimilarity term
+
+If saved outputs are available, the table below shows an actual model ranking
+from the example analysis.
+
+```{r baseline-models-saved}
+if (have_saved_outputs) {
+  summary_bundle$baseline_table
+}
+```
+
+This fixed-effect table is often even more informative than the rank table,
+because it shows how much the environmental coefficients shrink once geography
+enters the model.
+
+```{r baseline-fixef-saved}
+if (have_saved_outputs) {
+  summary_bundle$baseline_fixef
+}
+```
+
+For this example, the fast-run saved outputs suggest a simple but instructive
+pattern:
+
+- `IBD` is clearly supported relative to `Null`
+- `IBE` by itself is weaker than `IBD`
+- adding `cti_diff` and `hli_diff` to `IBD` changes the coefficients only
+  modestly in the fast run, suggesting that most of the baseline signal is
+  geographic rather than environmental
+- the multivariate `env_dist` model behaves similarly, which makes it a useful
+  sensitivity check rather than a replacement for the more interpretable
+  univariate terms
+
+# Step 3: Prepare the Conditional IBR Workflow
+
+Once the fixed covariates are chosen, they can be supplied directly to
+`gdist.prep()` so every resistance optimization is fit conditionally on those
+same `IBD` and `IBE` terms.
+
+```{r gdistance-inputs}
+pts <- vect(
+  rga2_demo$sample_coords,
+  type = "points",
+  crs = crs(r_covariate, proj = TRUE)
+)
+
+workflow_covariates <- data.frame(
+  geo = geo,
+  cti_diff = ibe_diff$cti_diff,
+  hli_diff = ibe_diff$hli_diff
+)
+
+gdist_inputs <- gdist.prep(
+  n.Pops = nrow(rga2_demo$sample_coords),
+  response = rga2_demo$genetic_vector,
+  samples = pts,
+  covariates = workflow_covariates,
+  formula = gd ~ geo + cti_diff + hli_diff,
+  method = "costDistance"
+)
+
+gdist_inputs$formula
+head(gdist_inputs$df)
+```
+
+The resulting optimization models are of the form:
+
+```r
+gd ~ geo + cti_diff + hli_diff + cd + (MLPE random effects)
+```
+
+where `cd` is the resistance-distance term generated from the candidate raster(s).
+
+This conditional formulation is the key to the joint framework. We are not
+asking whether `IBR` is better than `IBE` in isolation; we are asking whether a
+path-based resistance hypothesis still improves model fit after geography and
+endpoint environmental mismatch have already been accounted for.
+
+# Step 4: Run Single-Surface IBR Models Conditional on IBE
+
+This example treats `err27` and `ffp` as the candidate permeability hypotheses.
+
+```{r single-surface-setup, eval=FALSE}
+ibr_layers <- subset(r_covariate, c("err27", "ffp"))
+
+GA_inputs_ss <- GA.prep(
+  raster = ibr_layers,
+  Results.dir = file.path(tempdir(), "rga2-ibe-ibr-single"),
+  method = "LL",
+  seed = 123,
+  pop.size = 25,
+  maxiter = 15,
+  run = 5, 
+  parallel = F, 
+  keepBest = FALSE,
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+ss_out <- SS_optim(
+  gdist.inputs = gdist_inputs,
+  GA.inputs = GA_inputs_ss,
+  dist_mod = TRUE,
+  null_mod = TRUE,
+  diagnostic_plots = FALSE
+)
+
+ss_out$AICc
+summary(ss_out)
+```
+
+That table compares:
+
+- the optimized `IBR + IBD + IBE` model for each candidate raster
+- a pure geographic `Distance` model
+- a `Null` model with no fixed predictors beyond the intercept
+
+If saved outputs are available, we can inspect the actual optimization ranking:
+
+```{r ss-saved-table}
+if (have_saved_outputs) {
+  summary_bundle$ss_aicc
+}
+```
+
+The single-surface summary is also helpful because it packages the model
+ranking with a concise narrative about the best-supported surface.
+
+```{r ss-saved-summary}
+if (have_saved_outputs) {
+  summary(ss_out)
+}
+```
+
+And the corresponding plot provides a quick visual ranking of the candidate
+surfaces:
+
+```{r ss-saved-plot, fig.width=7, fig.height=5}
+if (have_saved_outputs) {
+  plot(ss_out)
+}
+```
+
+The exact top-ranked surface can vary across systems, and with shallow search
+settings it can also vary across exploratory runs if no seed is set. The key
+interpretive question is whether at least one candidate resistance surface
+outranks the pure `Distance` model while `IBD + IBE` are already in the fixed
+effects. If it does, that is evidence for an additional path-based landscape
+effect.
+
+# Step 5: Run a Multi-Surface IBR Model Conditional on IBE
+
+If the single-surface results suggest complementary hypotheses, a multisurface
+fit lets us ask whether a composite `IBR` term improves support further.
+
+```{r multi-surface, eval=FALSE}
+GA_inputs_ms <- GA.prep(
+  raster = ibr_layers,
+  Results.dir = file.path(tempdir(), "rga2-ibe-ibr-multi"),
+  method = "LL",
+  seed = 123,
+  pop.size = 25,
+  maxiter = 15,
+  run = 5,
+  parallel = FALSE,
+  keepBest = FALSE,
+  monitor = FALSE,
+  quiet = TRUE
+)
+
+ms_out <- MS_optim(
+  gdist.inputs = gdist_inputs,
+  GA.inputs = GA_inputs_ms,
+  diagnostic_plots = FALSE
+)
+
+ms_out$AICc.tab
+ms_out$percent.contribution
+summary(ms_out)
+```
+
+Multisurface optimization is especially helpful when two rasters are plausible
+for different ecological reasons. It lets us ask whether the best explanation
+is truly composite or whether one layer dominates once they are optimized
+together.
+
+```{r ms-saved-summary}
+if (have_saved_outputs) {
+  summary(ms_out)
+}
+```
+
+```{r ms-saved-plot, fig.width=7, fig.height=5}
+if (have_saved_outputs) {
+  plot(ms_out)
+}
+```
+
+The percent-contribution table is often more informative than the raw
+multisurface fit by itself. It tells us whether two plausible resistance
+hypotheses are both contributing meaningfully or whether one layer dominates
+once they are optimized together. That is scientifically useful because it
+shows that not every plausible raster necessarily adds unique explanatory power
+in the joint model.
+
+# Step 6: Generate Full Analysis Outputs Outside the Vignette
+
+The intended workflow is to run a separate builder script once, then let this
+vignette pull those saved outputs back in for a fully populated worked example.
+
+The package includes a builder script that runs the baseline MLPE models plus
+single- and multi-surface optimization and saves the results as `.rds` and
+`.csv` files beneath `inst/extdata/ibe-ibr-demo/` by default so the completed
+worked example can ship with the package.
+
+Run from the package root:
+
+```{r build-script, eval=FALSE}
+source("data-raw/build_ibe_ibr_vignette_outputs.R")
+build_ibe_ibr_demo_outputs()
+```
+
+From an RStudio session, you can specify the parameters directly:
+
+```r
+source("data-raw/build_ibe_ibr_vignette_outputs.R")
+
+build_ibe_ibr_demo_outputs(
+  profile = "default",
+  cores = NULL,
+  seed = 123
+)
+```
+
+For a quick smoke test:
+
+```r
+source("data-raw/build_ibe_ibr_vignette_outputs.R")
+
+build_ibe_ibr_demo_outputs(
+  profile = "fast",
+  cores = NULL,
+  seed = 123
+)
+```
+
+For a deeper run:
+
+```r
+source("data-raw/build_ibe_ibr_vignette_outputs.R")
+
+build_ibe_ibr_demo_outputs(
+  profile = "full",
+  cores = NULL,
+  seed = 123
+)
+```
+
+The function arguments are:
+
+- `profile = "fast"` for quick smoke tests
+- `profile = "default"` for a moderate reproducible example
+- `profile = "full"` for a deeper optimization run
+- `cores` as an optional positive integer passed to `GA.prep(parallel = ...)`
+- `seed` for reproducible GA initialization
+
+The `cores` argument is now passed directly through to `GA.prep(parallel = ...)`,
+including on Windows. For large optimization runs, this is the main knob for
+scaling the workflow across available hardware.
+
+The command-line interface still works if you prefer `Rscript`, but the
+function-based RStudio workflow is the recommended path for interactive use.
+
+The script writes:
+
+- `pair_data.rds`
+- `workflow_covariates.rds`
+- `baseline_models.rds`
+- `baseline_model_table.csv`
+- `baseline_fixed_effects.csv`
+- `single_surface/Results/` with optimizer summaries, rasters, and distance matrices
+- `single_surface_optim.rds`
+- `single_surface_aicc.csv`
+- `multi_surface/Results/` with multisurface summaries and percent contribution
+- `multi_surface_optim.rds`
+- `multi_surface_aicc.csv`
+- `analysis_summary.rds`
+
+# Step 7: Load and Explore Saved Outputs
+
+```{r load-saved, eval=FALSE}
+output_dir <- system.file("extdata", "ibe-ibr-demo", package = "ResistanceGA2")
+
+baseline_models <- readRDS(file.path(output_dir, "baseline_models.rds"))
+ss_out <- readRDS(file.path(output_dir, "single_surface_optim.rds"))
+ms_out <- readRDS(file.path(output_dir, "multi_surface_optim.rds"))
+summary_bundle <- readRDS(file.path(output_dir, "analysis_summary.rds"))
+
+summary_bundle$baseline_table
+summary_bundle$ss_aicc
+summary_bundle$ms_aicc
+
+plot(ss_out)
+plot(ms_out)
+```
+
+# Interpretation
+
+This framework lets us separate three related questions:
+
+1. Does genetic differentiation increase with geographic distance alone?
+2. Does endpoint environmental mismatch explain additional variation?
+3. Does a resistance-distance hypothesis still improve fit after controlling
+   for both geography and environment?
+
+Possible outcomes are:
+
+- `IBE` improves fit but `IBR` does not: endpoint mismatch matters more than
+  permeability.
+- `IBR` improves fit after conditioning on `IBE`: there is support for a
+  genuine landscape-connectivity effect.
+- both improve fit: connectivity and environmental mismatch likely contribute
+  independently.
+- coefficients become unstable or change sign across models: the predictors are
+  probably too correlated for strong mechanistic interpretation.
+
+The example here also shows why it is useful to explore several model classes
+instead of going straight to optimization:
+
+- baseline MLPE models tell us whether `IBE` is promising enough to include at all
+- conditional single-surface optimization tells us whether specific `IBR`
+  hypotheses improve fit beyond `IBD + IBE`
+- multisurface optimization tells us whether apparently useful resistance
+  layers still contribute once they compete in the same model
+
+That sequence turns the vignette into more than a software tutorial. It becomes
+an analysis template for asking:
+
+1. What is the best-supported baseline explanation of pairwise genetic structure?
+2. Does environmental mismatch add anything to geography?
+3. Does landscape permeability add anything after both of those are already in the model?
+4. If multiple resistance hypotheses are plausible, do they all matter, or does one dominate?
+
+The same workflow can be extended by:
+
+- replacing `cti` and `hli` with other site-level environmental variables
+- adding a single multivariate `env_dist` term instead of several univariate
+  mismatch terms
+- moving from `gdistance` to `jl.prep()` if Circuitscape-based pair filtering
+  or current maps are required

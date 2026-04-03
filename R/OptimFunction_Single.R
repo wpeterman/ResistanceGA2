@@ -119,11 +119,10 @@ Resistance.Opt_single <-
           if (inherits(cd, "try-error") || identical(cd, -99999)) {
             obj.func.opt <- -99999
           } else {
-            dat <- data.frame(gd  = gdist.inputs$response,
-                              cd  = scale(c(cd)),
-                              pop = gdist.inputs$ID$pop1)
+            dat    <- gdist.inputs$df
+            dat$cd <- scale(c(cd))
 
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1 | pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data    = dat,
                                 ZZ      = gdist.inputs$ZZ,
                                 REML    = FALSE)
@@ -152,7 +151,7 @@ Resistance.Opt_single <-
             dat     <- jl.inputs$df
             dat$cd  <- scale(cd)
 
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1 | pop),
+            fit.mod <- mlpe_rga(formula = jl.inputs$formula,
                                 data    = dat,
                                 ZZ      = jl.inputs$ZZ,
                                 REML    = FALSE)

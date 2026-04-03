@@ -151,6 +151,7 @@ test_that("jl.prep handles pairs_to_include, covariates, and write.files", {
   expect_equal(nrow(jl_inputs$covariates), sum(example$keep))
   expect_equal(ncol(jl_inputs$ZZ), sum(example$keep))
   expect_true(all(c("gd", "elev", "pop") %in% names(jl_inputs$df)))
+  expect_named(attr(jl_inputs$df, "mlpe_pairs"), "pop")
   expect_match(paste(deparse(jl_inputs$formula), collapse = " "), "cd")
 })
 
@@ -183,6 +184,103 @@ test_that("Run_CS.jl returns a full matrix with excluded pairs marked -1", {
   expect_equal(dim(out), c(5L, 5L))
   expect_true(any(out == -1, na.rm = TRUE))
   expect_true(all(diag(out) == 0))
+})
+
+test_that("Run_CS.ini writes INI overrides and returns full output", {
+  bindir <- skip_if_julia_unavailable()
+  example <- make_julia_example()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  export_dir <- tempfile("rga2-jl-ini-")
+  on.exit(unlink(export_dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  out <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::Run_CS.ini(
+        r = raster_orig[["cont_orig"]],
+        CS_Point.File = example$pts,
+        JULIA_HOME = bindir,
+        EXPORT.dir = export_dir,
+        return = "all",
+        quiet = TRUE,
+        connect_four_neighbors_only = TRUE,
+        write_cur_maps = TRUE,
+        write_cum_cur_map_only = TRUE,
+        log_level = "critical",
+        screenprint_log = FALSE,
+        rm.files = FALSE
+      )
+    )
+  )
+
+  expect_true(file.exists(out$ini_file))
+  expect_false(is.null(out$result))
+  expect_true(is.matrix(out$pairwise_matrix))
+  expect_equal(dim(out$pairwise_matrix), c(5L, 5L))
+  expect_true(inherits(out$current_map, "SpatRaster"))
+
+  ini_lines <- readLines(out$ini_file, warn = FALSE)
+  ini_text <- paste(ini_lines, collapse = "\n")
+  expect_match(ini_text, "scenario = pairwise", fixed = TRUE)
+  expect_match(ini_text, "connect_four_neighbors_only = True", fixed = TRUE)
+  expect_match(ini_text, "write_cur_maps = True", fixed = TRUE)
+  expect_match(ini_text, "write_cum_cur_map_only = True", fixed = TRUE)
+})
+
+test_that("Run_CS.ini supports advanced-mode raster files supplied as terra objects", {
+  bindir <- skip_if_julia_unavailable()
+  raster_orig <- unwrap_julia_raster(get_julia_pkg_data("raster_orig"))
+
+  habitat <- raster_orig[["cont_orig"]]
+  source_r <- terra::rast(habitat)
+  ground_r <- terra::rast(habitat)
+  mask_r <- terra::rast(habitat)
+
+  source_vals <- rep(0, terra::ncell(source_r))
+  ground_vals <- rep(0, terra::ncell(ground_r))
+  source_vals[5] <- 1
+  ground_vals[terra::ncell(ground_r) - 4] <- 1
+  terra::values(source_r) <- source_vals
+  terra::values(ground_r) <- ground_vals
+  terra::values(mask_r) <- 1
+
+  export_dir <- tempfile("rga2-jl-advanced-")
+  on.exit(unlink(export_dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  out <- suppressMessages(
+    suppressWarnings(
+      ResistanceGA2::Run_CS.ini(
+        r = habitat,
+        JULIA_HOME = bindir,
+        EXPORT.dir = export_dir,
+        return = "all",
+        quiet = TRUE,
+        scenario = "advanced",
+        source_file = source_r,
+        ground_file = ground_r,
+        ground_file_is_resistances = FALSE,
+        mask_file = mask_r,
+        write_cur_maps = TRUE,
+        write_cum_cur_map_only = TRUE,
+        rm.files = FALSE
+      )
+    )
+  )
+
+  expect_true(file.exists(out$ini_file))
+  expect_false(is.null(out$result))
+  expect_true(length(out$generated_files) > 0L)
+
+  ini_lines <- readLines(out$ini_file, warn = FALSE)
+  ini_text <- paste(ini_lines, collapse = "\n")
+  expect_match(ini_text, "scenario = advanced", fixed = TRUE)
+  expect_match(ini_text, "use_mask = True", fixed = TRUE)
+  mask_line <- ini_lines[grepl("^mask_file = ", ini_lines)]
+  source_line <- ini_lines[grepl("^source_file = ", ini_lines)]
+  ground_line <- ini_lines[grepl("^ground_file = ", ini_lines)]
+  expect_false(grepl("(Browse", mask_line, fixed = TRUE))
+  expect_false(grepl("(Browse", source_line, fixed = TRUE))
+  expect_false(grepl("(Browse", ground_line, fixed = TRUE))
 })
 
 test_that("SS_optim covers the Julia optimization branch", {
@@ -221,6 +319,7 @@ test_that("SS_optim covers the Julia optimization branch", {
     )
   )
 
+  expect_s3_class(ss_out, "resga_ss_optim")
   expect_s3_class(ss_out$AICc, "data.frame")
   expect_true("cont_orig" %in% ss_out$AICc$Surface)
 })
@@ -259,6 +358,7 @@ test_that("MS_optim covers the Julia multisurface branch", {
     )
   )
 
+  expect_s3_class(ms_out, "resga_ms_optim")
   expect_s3_class(ms_out$AICc.tab, "data.frame")
   expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
   expect_true(nrow(ms_out$percent.contribution) >= 2L)

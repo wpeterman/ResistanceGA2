@@ -253,6 +253,31 @@ head(cs_vector)
 
 ## Run_CS.jl() Parameter Details
 
+## Direct Circuitscape runs with `.ini`-style control
+
+If you want fuller control over Circuitscape options than `Run_CS.jl()` is
+designed to expose, use `Run_CS.ini()`.
+
+```{r run-cs-ini, eval=FALSE}
+cs_out <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "pairwise",
+  connect_four_neighbors_only = TRUE,
+  write_cur_maps = TRUE,
+  write_cum_cur_map_only = TRUE,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+See the separate `Direct Circuitscape Runs from R` vignette for examples using
+advanced mode, source and ground inputs, included-pairs files, and other
+Circuitscape support files.
+
+## Current maps
+
 | Parameter | Default | Description |
 |---|---|---|
 | `jl.inputs` | — | Output of `jl.prep()` |
@@ -316,6 +341,15 @@ ss_out <- SS_optim(
 )
 ```
 
+These optimization outputs are now S3 objects, so routine inspection is
+cleaner than before.
+
+```{r julia-s3-ss, eval=FALSE}
+class(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
 For multiple surfaces:
 
 ```{r julia-ms, eval=FALSE}
@@ -340,6 +374,14 @@ ms_out <- MS_optim(
 ```
 
 > **Tip:** During optimization, `ResistanceGA2` calls `Run_CS.jl()` hundreds or thousands of times (once per candidate solution per generation). Julia's startup overhead is paid only once when `JuliaConnectoR` first connects; subsequent calls are much faster. However, file I/O for the intermediate Circuitscape inputs and outputs still occurs each call. Setting `rm.files = TRUE` (the default) keeps the temporary directory clean and avoids accumulating large numbers of files.
+
+```{r julia-s3-ms, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+```
+
+# Tuning and Troubleshooting
 
 ---
 

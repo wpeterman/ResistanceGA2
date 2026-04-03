@@ -298,3 +298,65 @@ test_that("ZZ helpers support expanded IDs, correlation groups, and column selec
   expect_s4_class(zz_dropped, "dgCMatrix")
   expect_equal(ncol(zz_dropped), sum(drop_expanded))
 })
+
+test_that("Circuitscape file helpers materialize object inputs into temporary files", {
+  habitat <- terra::rast(nrows = 4, ncols = 4, xmin = 0, xmax = 4, ymin = 0, ymax = 4)
+  terra::values(habitat) <- seq_len(terra::ncell(habitat))
+  names(habitat) <- "habitat"
+
+  mask <- terra::rast(habitat)
+  terra::values(mask) <- rep(c(1, 0), length.out = terra::ncell(mask))
+  names(mask) <- "mask"
+
+  source_pts <- terra::vect(
+    matrix(c(0.5, 0.5,
+             3.5, 3.5), ncol = 2, byrow = TRUE),
+    type = "points"
+  )
+  terra::values(source_pts) <- data.frame(strength = c(2, 5))
+
+  ground_tbl <- data.frame(
+    value = c(10, 20),
+    x = c(1.5, 2.5),
+    y = c(1.5, 2.5)
+  )
+
+  config <- ResistanceGA2:::.cs_default_ini()
+  config[["Mask file"]][["mask_file"]] <- mask
+  config[["Options for advanced mode"]][["source_file"]] <- source_pts
+  config[["Options for advanced mode"]][["ground_file"]] <- ground_tbl
+  config[["Options for pairwise and one-to-all and all-to-one modes"]][["included_pairs_file"]] <-
+    list(mode = "exclude", pairs = data.frame(a = c(1, 2), b = c(2, 3)))
+  config[["Options for reclassification of habitat data"]][["reclass_file"]] <-
+    data.frame(from = c(1, 2), to = c(10, 20))
+
+  out <- ResistanceGA2:::.cs_materialize_file_options(config, scratch = tempdir())
+  on.exit(unlink(out$temp_files, force = TRUE), add = TRUE)
+
+  mask_path <- out$config[["Mask file"]][["mask_file"]]
+  source_path <- out$config[["Options for advanced mode"]][["source_file"]]
+  ground_path <- out$config[["Options for advanced mode"]][["ground_file"]]
+  pairs_path <- out$config[["Options for pairwise and one-to-all and all-to-one modes"]][["included_pairs_file"]]
+  reclass_path <- out$config[["Options for reclassification of habitat data"]][["reclass_file"]]
+
+  expect_true(all(file.exists(c(mask_path, source_path, ground_path, pairs_path, reclass_path))))
+  expect_match(readLines(pairs_path, warn = FALSE)[1], "mode exclude", fixed = TRUE)
+  expect_equal(ncol(utils::read.table(source_path)), 3L)
+  expect_equal(ncol(utils::read.table(ground_path)), 3L)
+  expect_equal(ncol(utils::read.table(reclass_path)), 2L)
+})
+
+test_that("Circuitscape network value-file helper writes two-column tables", {
+  network_values <- data.frame(node = c(1, 2, 5), value = c(1, 0, 3))
+  out <- ResistanceGA2:::.cs_prepare_value_map_file(
+    network_values,
+    arg = "source_file",
+    scratch = tempdir(),
+    prefix = "circuitscape_network_",
+    data_type = "network"
+  )
+  on.exit(unlink(out$temp_files, force = TRUE), add = TRUE)
+
+  expect_true(file.exists(out$path))
+  expect_equal(ncol(utils::read.table(out$path)), 2L)
+})

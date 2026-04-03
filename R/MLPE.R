@@ -106,23 +106,26 @@ MLPE.lmm <-
       }
     }
     
+    if (is.null(ID) && is.null(ZZ)) {
+      dat <- mlpe_data(response = response, resistance = cs.matrix)
+
+      return(
+        mlpe(
+          formula = response ~ resistance + (1 | pair),
+          data = dat,
+          pairs = c("from", "to"),
+          REML = REML
+        )
+      )
+    }
+
     dat <- data.frame(ID, resistance = cs.matrix, response = response)
     colnames(dat) <- c("pop1", "pop2", "resistance", "response")
-    
-    # Assign value to layer
-    #     LAYER<-assign("Resist",value=dat$cs.matrix)
-    
-    # Fit model
-    mod <-
-      lme4::lFormula(response ~ resistance + (1 | pop1),
-                     data = dat,
-                     REML = REML)
-    mod$reTrms$Zt <- ZZ
-    dfun <- do.call(lme4::mkLmerDevfun, mod)
-    opt <- lme4::optimizeLmer(dfun)
-    MOD <-
-      (lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-    return(MOD)
+
+    mlpe_rga(formula = response ~ resistance + (1 | pop1),
+             data = dat,
+             REML = REML,
+             ZZ = ZZ)
   }
 
 
@@ -140,10 +143,23 @@ MLPE.lmm2 <- function(resistance, response, REML = FALSE, ID, ZZ) {
     colnames(dat) <- c("pop1", "pop2", "resistance", "response")
     
   }
-  # Assign value to layer
-  #   LAYER<-assign("Resist",value=dat$resistance)
-  
-  # Fit model
+
+  dat <- .mlpe_attach_workflow_pairs(dat, ID)
+  pair_terms <- attr(dat, "mlpe_pairs", exact = TRUE)
+
+  if (is.list(pair_terms) && length(pair_terms) > 0L) {
+    formula <- .mlpe_formula_from_pair_terms("response",
+                                             "scale(resistance)",
+                                             pair_terms)
+
+    return(
+      mlpe_rga(formula = formula,
+               data = dat,
+               REML = REML,
+               ZZ = ZZ)
+    )
+  }
+
   mod <-
     lme4::lFormula(response ~ scale(resistance) + (1 | pop1),
                    data = dat,

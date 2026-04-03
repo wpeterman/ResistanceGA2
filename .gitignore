@@ -13,3 +13,4 @@ vignettes/*.pdf
 *.tar.gz
 /doc/
 /Meta/
+data-raw/generated/

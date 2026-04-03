@@ -132,6 +132,8 @@ gdist.prep <-
           "to reverse the relationship."
         )
       }
+
+      df <- .mlpe_attach_workflow_pairs(df, ID)
     }
 
     ret <- list(

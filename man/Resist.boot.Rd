@@ -37,7 +37,9 @@ Resist.boot(mod.names,
 \item{n.cores}{Number of cores to use when running bootstrap in parallel. Default 2 less than total available.}
 }
 \value{
-A data frame reporting the average model weight, average rank, number of times a model was the top model in the set, and the frequency a model was best.
+A data frame of class \code{resga_bootstrap} reporting the average
+  model weight, average rank, number of times a model was the top model in
+  the set, and the frequency a model was best.
 }
 \description{
 This is a 'pseudo' bootstrap procedure that will subsample a specified proportion of the sample locations/individuals, and will refit the MLPE model using the previously optimized resistance surface.

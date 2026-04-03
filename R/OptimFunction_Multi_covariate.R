@@ -22,10 +22,19 @@ Resistance.Opt_multi.cov <- function(PARM,
                                      GA.inputs,
                                      Min.Max      = "max",
                                      quiet        = FALSE) {
+  materialize_raster <- function(x) {
+    if (inherits(x, "PackedSpatRaster")) {
+      terra::unwrap(x)
+    } else {
+      x
+    }
+  }
 
   t1        <- proc.time()[3]
   method    <- GA.inputs$method
   File.name <- "resist_surface"
+  worker.inputs <- GA.inputs
+  worker.inputs$Resistance.stack <- materialize_raster(GA.inputs$Resistance.stack)
 
   materialize_raster <- function(x) {
     if (inherits(x, "PackedSpatRaster")) {

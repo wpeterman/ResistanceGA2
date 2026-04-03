@@ -345,8 +345,7 @@ Plot.trans <- function(PARM,
     dev.off()
     return(invisible(p))
   }
-  print(p)
-  invisible(p)
+  return(p)
   
 }
 

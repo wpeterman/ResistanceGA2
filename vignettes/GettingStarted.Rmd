@@ -45,7 +45,7 @@ Three hypotheses are commonly evaluated in landscape genetics:
 
 **Isolation by Environment (IBE):** Genetic differentiation reflects differences in local environmental conditions (temperature, elevation, soil type) that reduce the probability of successful migration between ecologically dissimilar sites, even if those sites are geographically close.
 
-These three hypotheses are not mutually exclusive. In many systems, genetic structure reflects a combination of all three. `ResistanceGA2` supports workflows that test these hypotheses individually and in combination, including the `mlpe_rga()` formula interface that lets you include environmental covariates alongside resistance distances in a single MLPE model. See the `IBE_IBR_Workflow` vignette for a full worked example of concurrent IBD/IBE/IBR testing.
+These three hypotheses are not mutually exclusive. In many systems, genetic structure reflects a combination of all three. `ResistanceGA2` supports workflows that test these hypotheses individually and in combination, including the `mlpe()` formula interface and `mlpe_data()` dyad constructor that let you include environmental covariates alongside resistance distances in a single MLPE model. See the `IBE_IBR_Framework` vignette for a full worked example of concurrent IBD/IBE/IBR testing.
 
 ## The Conceptual Workflow
 
@@ -272,13 +272,36 @@ ss_out <- SS_optim(
   diagnostic_plots = FALSE
 )
 
-# Multi-surface optimization (all layers combined)
+The returned object now has an S3 class with built-in `print()`, `summary()`,
+and `plot()` methods.
+
+```{r ss-s3, eval=FALSE}
+class(ss_out)
+print(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
+## Multisurface optimization
+
+```{r ms-workflow, eval=FALSE}
 ms_out <- MS_optim(
   gdist.inputs    = gdist_inputs,
   GA.inputs       = ga_inputs,
   diagnostic_plots = FALSE
 )
 ```
+
+Multisurface results support the same style of inspection.
+
+```{r ms-s3, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+plot(ms_out, type = "fit")
+```
+
+## All-combinations analysis
 
 For a full worked example with precomputed results, see the `ResistanceGA` vignette.
 
@@ -299,7 +322,15 @@ knitr::kable(ss_out$AICc, digits = 2, caption = "Single-surface model comparison
 ss_out$ContinuousResults
 ```
 
----
+`all_comb()` results also have S3 methods.
+
+```{r all-comb-s3, eval=FALSE}
+class(all_out)
+summary(all_out)
+plot(all_out)
+```
+
+# Transformations and Inspection
 
 # Visualizing Transformations
 
@@ -333,7 +364,12 @@ The two parameters that define every continuous transformation are:
 
 For a complete description of all eight transformation families and guidance on choosing among them, see the `Surface_Transformations` vignette.
 
----
+These objects still keep their original list structure, so existing code using
+`$AICc`, `$AICc.tab`, `$cd`, `$k`, and related components continues to work.
+The new S3 classes add a cleaner interactive layer on top of that structure.
+
+For larger or slower analyses, it is often worth running multiple replicates and
+checking for consistency in the top-supported surfaces and parameter estimates.
 
 # Key Terms Glossary
 
@@ -363,7 +399,7 @@ For a complete description of all eight transformation families and guidance on 
 |---|---|
 | `ResistanceGA` | Full workflow tutorial with single-surface, multi-surface, all-combinations, and bootstrap analyses using precomputed results |
 | `Surface_Transformations` | Detailed explanation of all eight transformation families, when to use each, and how to constrain the GA search |
-| `IBE_IBR_Workflow` | Concurrent testing of IBD, IBE, and IBR using `mlpe_rga()` with covariates and the ibe-ibr-demo dataset |
+| `IBE_IBR_Framework` | Concurrent testing of IBD, IBE, and IBR using `mlpe()`/`mlpe_data()` with pairwise environmental covariates and the Idaho demo dataset |
 | `Julia_Guide` | Installing Julia, configuring `JuliaConnectoR`, running Circuitscape, and troubleshooting |
 
 Access any vignette with:
@@ -371,7 +407,7 @@ Access any vignette with:
 ```{r vignette-access, eval=FALSE}
 vignette("ResistanceGA",         package = "ResistanceGA2")
 vignette("Surface_Transformations", package = "ResistanceGA2")
-vignette("IBE_IBR_Workflow",     package = "ResistanceGA2")
+vignette("IBE_IBR_Framework",    package = "ResistanceGA2")
 vignette("Julia_Guide",          package = "ResistanceGA2")
 ```
 

@@ -213,6 +213,17 @@ ss_out <- SS_optim(
 
 This is computationally expensive for large rasters or many sample locations. The code above is shown for reference; the results below are loaded from a precomputed file.
 
+The optimization result is still a named list, but it now carries an S3 class
+with package methods for `print()`, `summary()`, and `plot()`.
+
+```{r ss-optim-s3, eval=FALSE}
+class(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
+## Multi-Surface Optimization
+
 ## Loading and Displaying Results
 
 ```{r ss-results-load}
@@ -229,7 +240,7 @@ if (file.exists(ss_rds)) {
 }
 ```
 
-```{r ss-aic-table, eval=!is.null(ss_out)}
+```{r ss-aic-table, eval=exists("ss_out") && !is.null(ss_out)}
 knitr::kable(
   ss_out$AICc,
   digits  = 3,
@@ -247,7 +258,7 @@ The AICc table compares all surfaces tested plus the null and distance reference
 
 ## Recovered Transformation Parameters
 
-```{r ss-cont-results, eval=!is.null(ss_out)}
+```{r ss-cont-results, eval=exists("ss_out") && !is.null(ss_out)}
 if (!is.null(ss_out$ContinuousResults)) {
   knitr::kable(
     ss_out$ContinuousResults,
@@ -306,6 +317,15 @@ ms_out <- MS_optim(
 
 ## Loading Multi-Surface Results
 
+```{r ms-optim-s3, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+plot(ms_out, type = "fit")
+```
+
+If you want to reconstruct the optimized composite surface after a multisurface run:
+
 ```{r ms-results-load}
 ms_rds <- system.file(
   "extdata/vignette-results/ms_optim_results.rds",
@@ -320,7 +340,7 @@ if (file.exists(ms_rds)) {
 }
 ```
 
-```{r ms-aic-table, eval=!is.null(ms_out)}
+```{r ms-aic-table, eval=exists("ms_out") && !is.null(ms_out)}
 knitr::kable(
   ms_out$AICc,
   digits  = 3,
@@ -330,7 +350,7 @@ knitr::kable(
 
 ## Percent Contribution
 
-```{r ms-contribution, eval=!is.null(ms_out)}
+```{r ms-contribution, eval=exists("ms_out") && !is.null(ms_out)}
 if (!is.null(ms_out$percent.contribution)) {
   # percent.contribution is a data frame with columns: surface, mean
   pct <- ms_out$percent.contribution
@@ -403,6 +423,12 @@ combo_out <- all_comb(
 
 ## Loading all_comb Results
 
+```{r all-comb-s3, eval=FALSE}
+class(combo_out)
+summary(combo_out)
+plot(combo_out)
+```
+
 ```{r allcomb-results-load}
 ac_rds <- system.file(
   "extdata/vignette-results/all_comb_results.rds",
@@ -417,7 +443,7 @@ if (file.exists(ac_rds)) {
 }
 ```
 
-```{r allcomb-table, eval=!is.null(combo_out)}
+```{r allcomb-table, eval=exists("combo_out") && !is.null(combo_out)}
 if (!is.null(combo_out$summary.table)) {
   knitr::kable(
     combo_out$summary.table,
@@ -461,6 +487,7 @@ boot_out <- Resist.boot(
   obs          = n_pops,
   genetic.mat  = gd_mat
 )
+
 ```
 
 > **Note:** `dist.mat` must be a named list of **square** pairwise distance matrices (one per model). `n.parameters` is a numeric vector with the parameter count for each model (the `k` column from `$k` in SS/MS output). `obs` is the number of sampling locations as an integer. `genetic.mat` is the square genetic distance matrix without row or column names.
@@ -481,7 +508,7 @@ if (file.exists(boot_rds)) {
 }
 ```
 
-```{r boot-table, eval=!is.null(boot_out)}
+```{r boot-table, eval=exists("boot_out") && !is.null(boot_out)}
 knitr::kable(
   boot_out,
   digits  = 3,
@@ -490,6 +517,10 @@ knitr::kable(
 ```
 
 ## Interpreting Bootstrap Results
+
+If you want direct `.ini`-style access to Circuitscape from R, use
+`Run_CS.ini()` instead of `Run_CS.jl()`. That lower-level wrapper is described
+in the `Direct Circuitscape Runs from R` vignette.
 
 The `Resist.boot()` output is a tibble with one row per surface combination. Key columns:
 
@@ -515,7 +546,7 @@ The `Resist.boot()` output is a tibble with one row per surface combination. Key
 
 After running `SS_optim()`, `MS_optim()`, and optionally baseline IBD/null models, you can combine the AICc tables for a comprehensive comparison. The precomputed results below illustrate this workflow.
 
-```{r combined-comparison, eval=!is.null(ss_out) && !is.null(ms_out)}
+```{r combined-comparison, eval=exists("ss_out") && !is.null(ss_out) && exists("ms_out") && !is.null(ms_out)}
 # Combine SS and MS AICc tables (both have the same column structure)
 if (!is.null(ss_out) && !is.null(ms_out)) {
   all_results <- rbind(

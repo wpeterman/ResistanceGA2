@@ -6,8 +6,9 @@
 #' @param jl.inputs Object from \code{\link{jl.prep}}. Supply when optimizing with Circuitscape via Julia.
 #' @param GA.inputs Object from \code{\link{GA.prep}}.
 #' @param diagnostic_plots Logical. Generate and save diagnostic plots? Default = \code{TRUE}.
-#' @return A named list with GA summary, MLPE model, AICc table, distance matrices,
-#'   percent contribution, and \code{k} table.
+#' @return An object of class \code{resga_ms_optim}: a named list with GA
+#'   summary, MLPE model, AICc table, distance matrices, percent contribution,
+#'   and \code{k} table.
 #' @usage MS_optim(gdist.inputs = NULL, jl.inputs = NULL, GA.inputs, diagnostic_plots = TRUE)
 
 #' @export
@@ -313,22 +314,7 @@ MS_optim <- function(gdist.inputs = NULL,
     #   ZZ = gdist.inputs$ZZ
     # )
     
-    if (k.value == 1) {
-      k <- 2
-    } else if (k.value == 2) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else if (k.value == 3) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else {
-      k <- length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    }
+    k <- .rga_multisurface_k(fit.mod, GA.inputs)
     
     n <- gdist.inputs$n.Pops
     aic <- (-2 * LL) + (2 * k)
@@ -362,12 +348,17 @@ MS_optim <- function(gdist.inputs = NULL,
     
     # unlink(GA.inputs$Write.dir, recursive = T, force = T)
     
-    k.df <- data.frame(surface = NAME, k = k)
+    k.df <- data.frame(
+      surface = NAME,
+      k = k,
+      fixed.effects = .rga_fixed_effect_label(fit.mod)
+    )
     
     cd.list <- list(as.matrix(cd))
     names(cd.list) <- NAME
     
     AICc.tab <- data.frame(surface = NAME,
+                           fixed.effects = .rga_fixed_effect_label(fit.mod),
                            obj = multi.GA_nG@fitnessValue,
                            k = k,
                            AIC = aic,
@@ -379,6 +370,7 @@ MS_optim <- function(gdist.inputs = NULL,
     colnames(AICc.tab) <-
       c(
         "Surface",
+        "Fixed.Effects",
         paste0("obj.func_", GA.inputs$method),
         "k",
         "AIC",
@@ -396,6 +388,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   }
   
@@ -698,22 +691,7 @@ MS_optim <- function(gdist.inputs = NULL,
     
     MLPE.model <- fit.mod
     
-    if (k.value == 1) {
-      k <- 2
-    } else if (k.value == 2) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else if (k.value == 3) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else {
-      k <- length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    }
+    k <- .rga_multisurface_k(fit.mod, GA.inputs)
     
     n <- jl.inputs$n.Pops
     aic <- (-2 * LL) + (2 * k)
@@ -747,12 +725,17 @@ MS_optim <- function(gdist.inputs = NULL,
     
     # unlink(GA.inputs$Write.dir, recursive = T, force = T)
     
-    k.df <- data.frame(surface = NAME, k = k)
+    k.df <- data.frame(
+      surface = NAME,
+      k = k,
+      fixed.effects = .rga_fixed_effect_label(fit.mod)
+    )
     
     cd.list <- list(as.matrix(cd))
     names(cd.list) <- NAME
     
     AICc.tab <- data.frame(surface = NAME,
+                           fixed.effects = .rga_fixed_effect_label(fit.mod),
                            obj = multi.GA_nG@fitnessValue,
                            k = k,
                            AIC = aic,
@@ -764,6 +747,7 @@ MS_optim <- function(gdist.inputs = NULL,
     colnames(AICc.tab) <-
       c(
         "Surface",
+        "Fixed.Effects",
         paste0("obj.func_", GA.inputs$method),
         "k",
         "AIC",
@@ -783,6 +767,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   } # End Julia
 } # End function
