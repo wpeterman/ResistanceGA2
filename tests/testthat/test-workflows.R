@@ -18,6 +18,13 @@ make_temp_dir <- function(prefix = "ResistanceGA2-test-") {
   paste0(normalizePath(path, winslash = "/"), "/")
 }
 
+with_test_plot <- function(code) {
+  plot_file <- tempfile(fileext = ".pdf")
+  grDevices::pdf(plot_file)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  force(code)
+}
+
 make_pairwise_example <- function(n = 5, seed = 1) {
   set.seed(seed)
   coords <- matrix(runif(n * 2), ncol = 2)
@@ -33,7 +40,7 @@ make_pairwise_example <- function(n = 5, seed = 1) {
   )
 }
 
-make_smoke_inputs <- function(raster, prefix) {
+make_smoke_inputs <- function(raster, prefix, parallel = FALSE) {
   samples_df <- get_pkg_data("samples")
   pts <- terra::vect(samples_df[, 2:3], type = "points")
   response <- ResistanceGA2::lower(as.matrix(dist(samples_df[, 2:3])))
@@ -52,13 +59,14 @@ make_smoke_inputs <- function(raster, prefix) {
       maxiter = 1,
       run = 1,
       seed = 1,
+      parallel = parallel,
       monitor = FALSE,
       quiet = TRUE
     )
   )
 }
 
-make_covariate_smoke_inputs <- function(raster, prefix, n = 8) {
+make_covariate_smoke_inputs <- function(raster, prefix, n = 8, parallel = FALSE) {
   samples_df <- get_pkg_data("samples")[seq_len(n), , drop = FALSE]
   pts <- terra::vect(samples_df[, 2:3], type = "points")
   response_base <- ResistanceGA2::lower(as.matrix(dist(samples_df[, 2:3])))
@@ -81,6 +89,7 @@ make_covariate_smoke_inputs <- function(raster, prefix, n = 8) {
       maxiter = 1,
       run = 1,
       seed = 1,
+      parallel = parallel,
       monitor = FALSE,
       quiet = TRUE
     )
@@ -161,6 +170,25 @@ test_that("Plot.trans returns plot objects and can write TIFF output", {
   expect_s3_class(p_numeric, "ggplot")
   expect_true(any(c("ggExtraPlot", "ggplot") %in% class(p_raster)))
   expect_true(file.exists(file.path(out_dir, "Ricker_Transformation_plot-test.tif")))
+})
+
+test_that("Plot.trans does not explicitly print plots without a file device", {
+  p <- ResistanceGA2::Plot.trans(
+    PARM = c(2.5, 100),
+    Resistance = c(0, 1),
+    transformation = "Monomolecular",
+    marginal.plot = FALSE
+  )
+
+  expect_s3_class(p, "ggplot")
+  expect_equal(
+    sum(grepl(
+      "^[[:space:]]*print\\(p\\)$",
+      trimws(deparse(body(ResistanceGA2::Plot.trans))),
+      perl = TRUE
+    )),
+    1L
+  )
 })
 
 test_that("Plot.trans validates Resistance input", {
@@ -261,9 +289,16 @@ test_that("Resist.boot ranks simple candidate distance matrices", {
     genetic.mat = example$genetic_mat
   )
 
-  expect_s3_class(boot_out, "data.frame")
+  expect_s3_class(boot_out, c("resga_bootstrap", "data.frame"))
   expect_equal(nrow(boot_out), 2L)
   expect_true(all(c("surface", "avg.rank", "Percent.top", "k") %in% names(boot_out)))
+
+  boot_summary <- summary(boot_out)
+  expect_s3_class(boot_summary, "summary.resga_bootstrap")
+  expect_identical(boot_summary$best_surface, "model_1")
+  expect_output(print(boot_summary), "ResistanceGA2 bootstrap results")
+
+  expect_no_error(with_test_plot(plot(boot_out)))
 })
 
 test_that("SS_optim completes a minimal gdistance workflow", {
@@ -286,9 +321,19 @@ test_that("SS_optim completes a minimal gdistance workflow", {
     c("ContinuousResults", "CategoricalResults", "AICc", "MLPE",
       "Run.Time", "MLPE.list", "cd", "k", "ga")
   )
+  expect_s3_class(ss_out, "resga_ss_optim")
   expect_s3_class(ss_out$AICc, "data.frame")
   expect_length(ss_out$ga, 1L)
   expect_true("continuous" %in% names(ss_out$cd))
+
+  ss_summary <- summary(ss_out)
+  expect_s3_class(ss_summary, "summary.resga_ss_optim")
+  expect_identical(ss_summary$best_surface, "continuous")
+  printed <- paste(capture.output(print(ss_summary)), collapse = "\n")
+  expect_match(printed, "run time \\(min\\):")
+  expect_false(grepl("run time \\(sec\\):", printed))
+
+  expect_no_error(with_test_plot(plot(ss_out)))
 })
 
 test_that("MS_optim completes a minimal multisurface workflow", {
@@ -309,9 +354,16 @@ test_that("MS_optim completes a minimal multisurface workflow", {
     c("GA.summary", "MLPE.model", "MLPE.model_REML", "AICc.tab",
       "cd", "percent.contribution", "k")
   )
+  expect_s3_class(ms_out, "resga_ms_optim")
   expect_s4_class(ms_out$GA.summary, "ga")
   expect_s3_class(ms_out$AICc.tab, "data.frame")
   expect_s3_class(ms_out$percent.contribution, "data.frame")
+
+  ms_summary <- summary(ms_out)
+  expect_s3_class(ms_summary, "summary.resga_ms_optim")
+  expect_false(is.na(ms_summary$best_surface))
+
+  expect_no_error(with_test_plot(plot(ms_out)))
 })
 
 test_that("SS_optim covers covariate, distance, and null-model branches", {
@@ -330,8 +382,22 @@ test_that("SS_optim covers covariate, distance, and null-model branches", {
   )
 
   expect_s3_class(ss_out$AICc, "data.frame")
+  expect_true("Fixed.Effects" %in% names(ss_out$AICc))
   expect_true(all(c("Distance", "Null") %in% ss_out$AICc$Surface))
   expect_true(all(c("categorical", "continuous") %in% ss_out$AICc$Surface))
+
+  null_terms <- ss_out$AICc$Fixed.Effects[ss_out$AICc$Surface == "Null"]
+  distance_terms <- ss_out$AICc$Fixed.Effects[ss_out$AICc$Surface == "Distance"]
+
+  expect_match(null_terms, "elev")
+  expect_false(grepl("\\bcd\\b", null_terms))
+  expect_match(distance_terms, "elev")
+  expect_match(distance_terms, "\\bcd\\b")
+
+  expect_equal(
+    ss_out$AICc$k[ss_out$AICc$Surface == "Null"],
+    length(lme4::fixef(ss_out$MLPE.list[["Null"]]))
+  )
 })
 
 test_that("MS_optim covers the covariate branch", {
@@ -348,6 +414,95 @@ test_that("MS_optim covers the covariate branch", {
   )
 
   expect_s3_class(ms_out$AICc.tab, "data.frame")
-  expect_true(all(c("AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
+  expect_true(all(c("Fixed.Effects", "AICc", "LL", "R2m") %in% names(ms_out$AICc.tab)))
   expect_true(nrow(ms_out$percent.contribution) >= 2L)
+  expect_match(ms_out$AICc.tab$Fixed.Effects[[1]], "elev")
+  expect_match(ms_out$AICc.tab$Fixed.Effects[[1]], "\\bcd\\b")
+  expect_equal(
+    ms_out$AICc.tab$k[[1]],
+    sum(inputs$ga$parm.type$n.parm) +
+      length(lme4::fixef(ms_out$MLPE.model)) - 1
+  )
+})
+
+test_that("Windows parallel SS_optim completes a minimal workflow", {
+  skip_if(.Platform$OS.type != "windows", "Windows-specific regression test")
+
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, "continuous"),
+    prefix = "ss-optim-parallel-",
+    parallel = 2
+  )
+
+  ss_out <- ResistanceGA2::SS_optim(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = inputs$ga,
+    dist_mod = FALSE,
+    null_mod = FALSE,
+    diagnostic_plots = FALSE
+  )
+
+  expect_s3_class(ss_out, "resga_ss_optim")
+  expect_true("continuous" %in% ss_out$AICc$Surface)
+})
+
+test_that("Windows parallel MS_optim completes the multisurface covariate workflow", {
+  skip_if(.Platform$OS.type != "windows", "Windows-specific regression test")
+
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_covariate_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    prefix = "ms-optim-parallel-",
+    parallel = 2
+  )
+
+  ms_out <- ResistanceGA2::MS_optim(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = inputs$ga,
+    diagnostic_plots = FALSE
+  )
+
+  expect_s3_class(ms_out, "resga_ms_optim")
+  expect_true(nrow(ms_out$AICc.tab) >= 1L)
+})
+
+test_that("all_comb aligns bootstrap model metadata when Null is included", {
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    prefix = "all-comb-source-"
+  )
+
+  ga_inputs <- ResistanceGA2::GA.prep(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    Results.dir = "all.comb",
+    pop.size = 10,
+    maxiter = 1,
+    run = 1,
+    seed = 1,
+    parallel = FALSE,
+    monitor = FALSE,
+    quiet = TRUE
+  )
+
+  out_dir <- make_temp_dir("all-comb-results-")
+
+  combo_out <- ResistanceGA2::all_comb(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = ga_inputs,
+    results.dir = out_dir,
+    max.combination = 2,
+    iters = 1,
+    replicate = 1,
+    dist_mod = TRUE,
+    null_mod = TRUE
+  )
+
+  expect_s3_class(combo_out, "resga_all_comb")
+  expect_true("Null" %in% combo_out$summary.table$Surface)
+  expect_false("Null" %in% names(combo_out$all.cd))
+  expect_setequal(names(combo_out$all.cd), combo_out$boot.results$surface)
+  expect_true(all(names(combo_out$all.cd) %in% combo_out$all.k$surface))
+  expect_output(print(summary(combo_out)), "Bootstrap support")
 })

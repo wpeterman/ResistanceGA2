@@ -9,7 +9,9 @@
 #' @param dist_mod Logical, if TRUE, a Distance model will be calculated and added to the output table (default = TRUE)
 #' @param null_mod Logical, if TRUE, an intercept-only model will be calculated and added to the output table (default = TRUE)
 #' @param diagnostic_plots Plotting and saving of diagnostic plots (Default = TRUE)
-#' @return This function optimizes resistance surfaces in isolation. Following optimization of all surfaces, several summary objects are created.\cr
+#' @return An object of class \code{resga_ss_optim}. This function optimizes
+#' resistance surfaces in isolation. Following optimization of all surfaces,
+#' several summary objects are created.\cr
 #' \enumerate{
 #' \item Diagnostic plots of model fit are output to the \code{Results/Plots}
 #' directory created beneath \code{Results.dir}.
@@ -49,7 +51,7 @@
 #'
 #' ss.out <- SS_optim(
 #'   gdist.inputs = gdist.inputs,
-#'   GA.inputs = GA.inputs,
+#'   GA.inputs = GA.worker.inputs,
 #'   dist_mod = FALSE,
 #'   null_mod = FALSE,
 #'   diagnostic_plots = FALSE
@@ -69,6 +71,7 @@ SS_optim <- function(gdist.inputs = NULL,
   cnt1 <- 0
   cnt2 <- 0
   k.value <- GA.inputs$k.value
+  GA.worker.inputs <- .rga_prepare_parallel_inputs(GA.inputs)
   MLPE.list <- list()
   cd.list <- list()
   k.list <- list()
@@ -104,14 +107,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -314,14 +317,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -509,14 +512,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -634,12 +637,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -726,14 +729,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -859,12 +862,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -955,12 +958,12 @@ SS_optim <- function(gdist.inputs = NULL,
             col.names = F
           )
           
-          fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                               data = dat,
                               ZZ = gdist.inputs$ZZ,
                               REML = FALSE)
           
-          fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                    data = dat,
                                    ZZ = gdist.inputs$ZZ,
                                    REML = TRUE)
@@ -1023,22 +1026,22 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(gdist.inputs$ID, response = gdist.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- gdist.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- gdist.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .rga_null_model_formula(
+              formula = gdist.inputs$formula,
+              data = dat,
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = gdist.inputs$ZZ,
+            REML = FALSE
+          )
+
+          MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(gdist.inputs$ID)
           k <- 1
           
@@ -1097,14 +1100,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -1218,7 +1221,7 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
@@ -1312,14 +1315,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -1443,7 +1446,7 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
@@ -1542,14 +1545,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -1666,12 +1669,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #   k <- length(GA.inputs$layer.names[i]) + 1
             # }
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -1757,14 +1760,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -1891,12 +1894,12 @@ SS_optim <- function(gdist.inputs = NULL,
             #     )
             #   )
             
-            fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                                 data = dat,
                                 ZZ = gdist.inputs$ZZ,
                                 REML = FALSE)
             
-            fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+            fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                      data = dat,
                                      ZZ = gdist.inputs$ZZ,
                                      REML = TRUE)
@@ -1987,12 +1990,12 @@ SS_optim <- function(gdist.inputs = NULL,
             col.names = F
           )
           
-          fit.mod <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
                               data = dat,
                               ZZ = gdist.inputs$ZZ,
                               REML = FALSE)
           
-          fit.mod_REML <- mlpe_rga(formula = gd ~ cd + (1|pop),
+          fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                                    data = dat,
                                    ZZ = gdist.inputs$ZZ,
                                    REML = TRUE)
@@ -2054,22 +2057,22 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(gdist.inputs$ID, response = gdist.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- gdist.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- gdist.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .rga_null_model_formula(
+              formula = gdist.inputs$formula,
+              data = dat,
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = gdist.inputs$ZZ,
+            REML = FALSE
+          )
+
+          MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(gdist.inputs$ID)
           k <- 1
           
@@ -2135,14 +2138,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -2347,14 +2350,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               gdist.inputs = gdist.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -2541,14 +2544,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -2733,14 +2736,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single.cov,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -2990,22 +2993,22 @@ SS_optim <- function(gdist.inputs = NULL,
         }
         
         if (null_mod == TRUE) {
-          dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-          colnames(dat) <- c("pop1", "pop2", "response")
-          
-          # Fit model
-          mod <-
-            lFormula(response ~ 1 + (1 | pop1),
-                     data = dat,
-                     REML = FALSE)
-          mod$reTrms$Zt <- jl.inputs$ZZ
-          dfun <- do.call(mkLmerDevfun, mod)
-          opt <- optimizeLmer(dfun)
-          
-          fit.stats <-
-            r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-          LL <-
-            logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          dat <- jl.inputs$df
+          fit.null <- mlpe_rga(
+            formula = .rga_null_model_formula(
+              formula = jl.inputs$formula,
+              data = dat,
+              fallback = gd ~ 1 + (1 | pop)
+            ),
+            data = dat,
+            ZZ = jl.inputs$ZZ,
+            REML = FALSE
+          )
+
+          MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
+          LL <- logLik(fit.null)
           ROW <- nrow(jl.inputs$ID)
           k <- 1
           
@@ -3064,14 +3067,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -3267,14 +3270,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- gaisl(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -3528,22 +3531,22 @@ SS_optim <- function(gdist.inputs = NULL,
           }
           
           if (null_mod == TRUE) {
-            dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-            colnames(dat) <- c("pop1", "pop2", "response")
-            
-            # Fit model
-            mod <-
-              lFormula(response ~ 1 + (1 | pop1),
-                       data = dat,
-                       REML = FALSE)
-            mod$reTrms$Zt <- jl.inputs$ZZ
-            dfun <- do.call(mkLmerDevfun, mod)
-            opt <- optimizeLmer(dfun)
-            
-            fit.stats <-
-              r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-            LL <-
-              logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+            dat <- jl.inputs$df
+            fit.null <- mlpe_rga(
+              formula = .rga_null_model_formula(
+                formula = jl.inputs$formula,
+                data = dat,
+                fallback = gd ~ 1 + (1 | pop)
+              ),
+              data = dat,
+              ZZ = jl.inputs$ZZ,
+              REML = FALSE
+            )
+
+            MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
+            LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
             
@@ -3594,14 +3597,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -3799,14 +3802,14 @@ SS_optim <- function(gdist.inputs = NULL,
             single.GA <- ga(
               type = "real-valued",
               fitness = Resistance.Opt_single,
-              Resistance = r,
+              Resistance = .rga_wrap_raster_for_parallel(r, GA.inputs$parallel),
               population = GA.inputs$population,
               selection = GA.inputs$selection,
               pcrossover = GA.inputs$pcrossover,
               pmutation = GA.inputs$pmutation,
               crossover = GA.inputs$crossover,
               Min.Max = GA.inputs$Min.Max,
-              GA.inputs = GA.inputs,
+              GA.inputs = GA.worker.inputs,
               jl.inputs = jl.inputs,
               lower = GA.inputs$min.list[[i]],
               upper = GA.inputs$max.list[[i]],
@@ -4086,22 +4089,22 @@ SS_optim <- function(gdist.inputs = NULL,
           }
           
           if (null_mod == TRUE) {
-            dat <- data.frame(jl.inputs$ID, response = jl.inputs$response)
-            colnames(dat) <- c("pop1", "pop2", "response")
-            
-            # Fit model
-            mod <-
-              lFormula(response ~ 1 + (1 | pop1),
-                       data = dat,
-                       REML = FALSE)
-            mod$reTrms$Zt <- jl.inputs$ZZ
-            dfun <- do.call(mkLmerDevfun, mod)
-            opt <- optimizeLmer(dfun)
-            
-            fit.stats <-
-              r.squaredGLMM(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-            LL <-
-              logLik(mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+            dat <- jl.inputs$df
+            fit.null <- mlpe_rga(
+              formula = .rga_null_model_formula(
+                formula = jl.inputs$formula,
+                data = dat,
+                fallback = gd ~ 1 + (1 | pop)
+              ),
+              data = dat,
+              ZZ = jl.inputs$ZZ,
+              REML = FALSE
+            )
+
+            MLPE.list[['Null']] <- fit.null
+
+          fit.stats <- r.squaredGLMM(fit.null)
+            LL <- logLik(fit.null)
             ROW <- nrow(jl.inputs$ID)
             k <- 1
             
@@ -4168,6 +4171,8 @@ SS_optim <- function(gdist.inputs = NULL,
   }
   
   
+  n.pops <- if (!is.null(gdist.inputs)) gdist.inputs$n.Pops else jl.inputs$n.Pops
+
   # Compile results into tables
   cat("\n")
   cat("\n")
@@ -4189,6 +4194,12 @@ SS_optim <- function(gdist.inputs = NULL,
         "LL",
         Features
       )
+    Results.cat <- .rga_update_result_table_models(
+      result_table = Results.cat,
+      fit_list = MLPE.list,
+      GA.inputs = GA.inputs,
+      n_pops = n.pops
+    )
     Results.cat <-  Results.cat[order(Results.cat$AICc), ]
     write.table(
       Results.cat,
@@ -4214,6 +4225,12 @@ SS_optim <- function(gdist.inputs = NULL,
         "shape",
         "max"
       )
+    Results.cont <- .rga_update_result_table_models(
+      result_table = Results.cont,
+      fit_list = MLPE.list,
+      GA.inputs = GA.inputs,
+      n_pops = n.pops
+    )
     Results.cont <- Results.cont[order(Results.cont$AICc), ]
     write.table(
       Results.cont,
@@ -4225,19 +4242,47 @@ SS_optim <- function(gdist.inputs = NULL,
   }
   
   # Full Results
+  summary.cols <- c(
+    "Surface",
+    "Fixed.Effects",
+    paste0("obj.func_", GA.inputs$method),
+    "k",
+    "AIC",
+    "AICc",
+    "R2m",
+    "R2c",
+    "LL"
+  )
+
   if (nrow(Results.cat) > 0 & nrow(Results.cont) > 0) {
-    Results.All <- rbind(Results.cat[, c(1:8)], Results.cont[, c(1:8)])
+    Results.All <- rbind(
+      Results.cat[, summary.cols, drop = FALSE],
+      Results.cont[, summary.cols, drop = FALSE]
+    )
   } else if (nrow(Results.cat) < 1 & nrow(Results.cont) > 0) {
-    Results.All <- (Results.cont[, c(1:8)])
+    Results.All <- Results.cont[, summary.cols, drop = FALSE]
   } else {
-    Results.All <- (Results.cat[, c(1:8)])
+    Results.All <- Results.cat[, summary.cols, drop = FALSE]
   }
   
-  if (dist_mod == TRUE)
+  if (dist_mod == TRUE) {
+    Dist.AICc$Fixed.Effects <- NA_character_
+    Dist.AICc <- Dist.AICc[, summary.cols, drop = FALSE]
     Results.All <- rbind(Results.All, Dist.AICc)
-  if (null_mod == TRUE)
+  }
+
+  if (null_mod == TRUE) {
+    Null.AICc$Fixed.Effects <- NA_character_
+    Null.AICc <- Null.AICc[, summary.cols, drop = FALSE]
     Results.All <- rbind(Results.All, Null.AICc)
+  }
   
+  Results.All <- .rga_update_result_table_models(
+    result_table = Results.All,
+    fit_list = MLPE.list,
+    GA.inputs = GA.inputs,
+    n_pops = n.pops
+  )
   Results.All <- Results.All[order(Results.All$AICc), ]
   
   cat("\n")
@@ -4278,8 +4323,8 @@ SS_optim <- function(gdist.inputs = NULL,
   } 
   # } ## End covariate if-else
   
-  k.list <- plyr::ldply(k.list)
-  colnames(k.list) <- c("surface", "k")
+  k.list <- Results.All[, c("Surface", "k", "Fixed.Effects"), drop = FALSE]
+  colnames(k.list) <- c("surface", "k", "fixed.effects")
   
   rt <- proc.time()[3] - t1
   # Full Results
@@ -4341,5 +4386,9 @@ SS_optim <- function(gdist.inputs = NULL,
   # rm(single.GA, r)
   setwd(wd)
   gc()
+  RESULTS <- resga_add_class(RESULTS, "resga_ss_optim")
   return(RESULTS)
 }
+
+
+

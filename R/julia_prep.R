@@ -381,6 +381,10 @@ jl.prep <- function(n.Pops,
     }
   }
 
+  if (!is.null(df)) {
+    df <- .mlpe_attach_workflow_pairs(df, ID.keep)
+  }
+
   # Return --------------------------------------------------------------------
   list(
     ID                    = ID.keep,

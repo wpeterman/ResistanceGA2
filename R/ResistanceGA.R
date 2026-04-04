@@ -224,3 +224,58 @@ NULL
 #' @keywords datasets
 #' 
 NULL
+
+#' Data file. Idaho demo data for joint IBR/IBE examples
+#'
+#' A named list bundling a small Columbia spotted frog example derived from the
+#' \pkg{GeNetIt} and \pkg{LandGenCourse} teaching materials.
+#'
+#' \itemize{
+#'   \item sites. A 12-row data frame of selected sites from
+#'     \code{GeNetIt::ralu.site}, including \code{demo_id}, the original site
+#'     attributes, and projected UTM coordinates (\code{x}, \code{y}).
+#'   \item sample_coords. A 12 x 2 numeric matrix of sample coordinates in the
+#'     same order as the genetic matrix.
+#'   \item site_environment. A data frame of raster values extracted at the 12
+#'     sites from \code{rga2_demo_covariates}.
+#'   \item genetic_matrix. A 12 x 12 symmetric chord-distance matrix imported
+#'     from the LandGenCourse radish example.
+#'   \item genetic_vector. The lower-triangle vector of
+#'     \code{genetic_matrix} in package order.
+#' }
+#'
+#' See \code{data-raw/build_rga2_demo.R} for the pinned source revisions used
+#' to construct this demo.
+#'
+#' @docType data
+#' @name rga2_demo
+#' @format A named list of length 5
+#' @usage data(rga2_demo)
+#' @keywords datasets
+NULL
+
+#' Data file. Idaho demo raster covariates
+#'
+#' A \code{SpatRaster} containing the six Idaho raster layers used to construct
+#' \code{rga2_demo}. The layers are derived from \pkg{GeNetIt} and include
+#' \code{cti}, \code{err27}, \code{ffp}, \code{gsp}, \code{hli}, and
+#' \code{nlcd}.
+#'
+#' @docType data
+#' @name rga2_demo_covariates
+#' @format \code{SpatRaster} with 6 layers
+#' @usage data(rga2_demo_covariates)
+#' @keywords datasets
+NULL
+
+#' Data file. Idaho demo genetic distance matrix
+#'
+#' A 12 x 12 symmetric chord-distance matrix used in \code{rga2_demo}. Row and
+#' column names match the \code{demo_id} values in \code{rga2_demo$sites}.
+#'
+#' @docType data
+#' @name rga2_demo_genetic
+#' @format A 12 x 12 numeric matrix
+#' @usage data(rga2_demo_genetic)
+#' @keywords datasets
+NULL

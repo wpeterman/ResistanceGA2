@@ -51,7 +51,11 @@ files located in this directory may be deleted after confirmation.}
 \item{...}{Additional arguments (Not currently used)}
 }
 \value{
-This function optimizes resistance surfaces in isolation using \code{\link[ResistanceGA2]{SS_optim}}, followed by multisurface optimization using \code{\link[ResistanceGA2]{MS_optim}}, and then conducts a bootstrap analysis.
+An object of class \code{resga_all_comb}. This function optimizes
+  resistance surfaces in isolation using
+  \code{\link[ResistanceGA2]{SS_optim}}, followed by multisurface
+  optimization using \code{\link[ResistanceGA2]{MS_optim}}, and then
+  conducts a bootstrap analysis.
 }
 \description{
 A wrapper function to run both \code{\link[ResistanceGA2]{SS_optim}} and

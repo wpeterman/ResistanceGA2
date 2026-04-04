@@ -25,7 +25,9 @@ SS_optim(gdist.inputs,
 \item{diagnostic_plots}{Plotting and saving of diagnostic plots (Default = TRUE)}
 }
 \value{
-This function optimizes resistance surfaces in isolation. Following optimization of all surfaces, several summary objects are created.\cr
+An object of class \code{resga_ss_optim}. This function optimizes
+resistance surfaces in isolation. Following optimization of all surfaces,
+several summary objects are created.\cr
 \enumerate{
 \item Diagnostic plots of model fit are output to the \code{Results/Plots}
 directory created beneath \code{Results.dir}.
@@ -61,7 +63,7 @@ GA.inputs <- GA.prep(
 
 ss.out <- SS_optim(
   gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
+  GA.inputs = GA.worker.inputs,
   dist_mod = FALSE,
   null_mod = FALSE,
   diagnostic_plots = FALSE

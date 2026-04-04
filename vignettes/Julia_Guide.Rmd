@@ -46,7 +46,7 @@ library(terra)
 | Random-walk distances | Yes (resistance distance) | Yes (commuteDistance) |
 | Least-cost path distances | No | Yes (costDistance) |
 
-For most iterative optimization workflows, `gdistance::commuteDistance()` is the most convenient choice — it stays inside R, requires no external setup, and produces qualitatively similar distances to Circuitscape resistance distance. Use Julia/Circuitscape when you need to:
+For most iterative optimization workflows, `gdistance::commuteDistance()` is the most convenient choice as it stays inside R, requires no external setup, and produces qualitatively similar distances to Circuitscape resistance distance. Use Julia/Circuitscape when you need to:
 
 - Produce output that directly matches a Circuitscape workflow (for comparability with published analyses).
 - Generate cumulative current maps for visualization or downstream analysis.
@@ -78,7 +78,7 @@ Open a terminal (Command Prompt, PowerShell, or bash) and run:
 julia --version
 ```
 
-You should see output like `julia version 1.11.4`. If the command is not found, Julia's `bin/` directory is not on your PATH — you may need to add it manually, or just supply the full path when configuring `ResistanceGA2`.
+You should see output like `julia version 1.11.4`. If the command is not found, Julia's `bin/` directory is not on your PATH. You may need to add it manually, or just supply the full path when configuring `ResistanceGA2`.
 
 ---
 
@@ -173,7 +173,8 @@ If both commands succeed without error, your Julia/Circuitscape setup is ready f
 
 ```{r small-example}
 pts     <- vect(samples[, 2:3], type = "points")
-surface <- resistance_surfaces[["continuous"]]
+surfaces <- terra::unwrap(resistance_surfaces)
+surface  <- terra::subset(surfaces, "continuous")
 
 pts
 surface
@@ -181,7 +182,7 @@ surface
 
 ## Create Julia Inputs with jl.prep()
 
-`jl.prep()` configures everything needed for Circuitscape runs. Setting `run_test = TRUE` is strongly recommended the first time you use the package on a new machine — it runs a small Circuitscape test to verify the full pipeline before a long optimization:
+`jl.prep()` configures everything needed for Circuitscape runs. Setting `run_test = TRUE` is strongly recommended the first time you use the package on a new machine; it runs a small Circuitscape test to verify the full pipeline before a long optimization:
 
 ```{r jl-prep, eval=FALSE}
 pairwise_genetic <- lower(as.matrix(dist(samples[, 2:3])))
@@ -202,10 +203,10 @@ names(jl_inputs)
 
 | Parameter | Default | Description |
 |---|---|---|
-| `n.Pops` | — | Number of sample populations |
+| `n.Pops` | required | Number of sample populations |
 | `response` | NULL | Pairwise genetic distances (vector from `lower()`) |
-| `CS_Point.File` | — | `SpatVector` of sample point locations |
-| `JULIA_HOME` | — | Path to Julia `bin/` directory |
+| `CS_Point.File` | required | `SpatVector` of sample point locations |
+| `JULIA_HOME` | required | Path to Julia `bin/` directory |
 | `run_test` | FALSE | Run a test Circuitscape calculation to verify setup |
 | `silent` | FALSE | Suppress Julia startup messages |
 | `cholmod` | TRUE | Use CHOLMOD direct solver (faster, more memory) |
@@ -225,6 +226,11 @@ names(jl_inputs)
 
 ## Run_CS.jl() for Pairwise Distances
 
+In this workflow, `Run_CS.jl(..., output = "matrix")` returns a lower-triangle
+vector of pairwise resistance distances, ordered the same way as other
+`ResistanceGA2` pairwise outputs. That is why the result is indexed like a
+vector, not like a 2-D matrix.
+
 ```{r run-circuitscape, eval=FALSE}
 cs_vector <- Run_CS.jl(
   jl.inputs = jl_inputs,
@@ -232,8 +238,8 @@ cs_vector <- Run_CS.jl(
   output    = "matrix"
 )
 
-dim(cs_vector)
-cs_vector[1:4, 1:4]
+length(cs_vector)
+head(cs_vector)
 ```
 
 The precomputed example for the small dataset ships with the package:
@@ -247,10 +253,35 @@ head(cs_vector)
 
 ## Run_CS.jl() Parameter Details
 
+## Direct Circuitscape runs with `.ini`-style control
+
+If you want fuller control over Circuitscape options than `Run_CS.jl()` is
+designed to expose, use `Run_CS.ini()`.
+
+```{r run-cs-ini, eval=FALSE}
+cs_out <- Run_CS.ini(
+  r = surface,
+  CS_Point.File = pts,
+  JULIA_HOME = JULIA_HOME,
+  scenario = "pairwise",
+  connect_four_neighbors_only = TRUE,
+  write_cur_maps = TRUE,
+  write_cum_cur_map_only = TRUE,
+  return = "all",
+  rm.files = FALSE
+)
+```
+
+See the separate `Direct Circuitscape Runs from R` vignette for examples using
+advanced mode, source and ground inputs, included-pairs files, and other
+Circuitscape support files.
+
+## Current maps
+
 | Parameter | Default | Description |
 |---|---|---|
-| `jl.inputs` | — | Output of `jl.prep()` |
-| `r` | — | `SpatRaster` resistance surface |
+| `jl.inputs` | required | Output of `jl.prep()` |
+| `r` | required | `SpatRaster` resistance surface |
 | `CurrentMap` | FALSE | Compute cumulative current map in addition to pairwise distances |
 | `output` | `"matrix"` | `"matrix"` for pairwise distances; `"raster"` for current map |
 | `EXPORT.dir` | NULL | Directory for output files when `output = "raster"` |
@@ -281,18 +312,18 @@ plot(current_map, main = "Cumulative current map")
 The package ships a precomputed current map for the small example:
 
 ```{r precomputed-current-map}
-vignette_current_map
+plot(vignette_current_map)
 ```
 
 ---
 
 # Julia in Optimization Workflows
 
-Once `jl_inputs` is ready, the optimization workflow is identical to the `gdistance` workflow — simply pass `jl.inputs` instead of `gdist.inputs`:
+Once `jl_inputs` is ready, the optimization workflow is identical to the `gdistance` workflow: simply pass `jl.inputs` instead of `gdist.inputs`:
 
 ```{r julia-optim, eval=FALSE}
 GA.inputs <- GA.prep(
-  raster      = resistance_surfaces[["continuous"]],
+  raster      = terra::subset(terra::unwrap(resistance_surfaces), "continuous"),
   Results.dir = file.path(tempdir(), "ResistanceGA2-julia"),
   pop.size    = 25,
   maxiter     = 200,
@@ -310,11 +341,23 @@ ss_out <- SS_optim(
 )
 ```
 
+These optimization outputs are now S3 objects, so routine inspection is
+cleaner than before.
+
+```{r julia-s3-ss, eval=FALSE}
+class(ss_out)
+summary(ss_out)
+plot(ss_out)
+```
+
 For multiple surfaces:
 
 ```{r julia-ms, eval=FALSE}
 GA.inputs_multi <- GA.prep(
-  raster      = resistance_surfaces[[c("categorical", "continuous")]],
+  raster      = terra::subset(
+    terra::unwrap(resistance_surfaces),
+    c("categorical", "continuous")
+  ),
   Results.dir = file.path(tempdir(), "ResistanceGA2-julia-multi"),
   pop.size    = 25,
   maxiter     = 200,
@@ -330,7 +373,15 @@ ms_out <- MS_optim(
 )
 ```
 
-> **Tip:** During optimization, `ResistanceGA2` calls `Run_CS.jl()` hundreds or thousands of times — once per candidate solution per generation. Julia's startup overhead is paid only once (when `JuliaConnectoR` first connects); subsequent calls are much faster. However, file I/O for the intermediate Circuitscape inputs and outputs still occurs each call. Setting `rm.files = TRUE` (the default) keeps the temporary directory clean and avoids accumulating large numbers of files.
+> **Tip:** During optimization, `ResistanceGA2` calls `Run_CS.jl()` hundreds or thousands of times (once per candidate solution per generation). Julia's startup overhead is paid only once when `JuliaConnectoR` first connects; subsequent calls are much faster. However, file I/O for the intermediate Circuitscape inputs and outputs still occurs each call. Setting `rm.files = TRUE` (the default) keeps the temporary directory clean and avoids accumulating large numbers of files.
+
+```{r julia-s3-ms, eval=FALSE}
+class(ms_out)
+summary(ms_out)
+plot(ms_out)
+```
+
+# Tuning and Troubleshooting
 
 ---
 
@@ -352,9 +403,15 @@ The two distance measures will typically be very highly correlated (r > 0.95) fo
 
 ```{r compare-outputs, eval=FALSE}
 # Compute both distance types from the same surface
+gdist_inputs <- gdist.prep(
+  n.Pops = nrow(samples),
+  samples = terra::vect(samples[, 2:3], type = "points"),
+  method = "commuteDistance"
+)
+
 gdist_out <- Run_gdistance(
   gdist.inputs = gdist_inputs,
-  r            = resistance_surfaces[["continuous"]]
+  r            = terra::subset(terra::unwrap(resistance_surfaces), "continuous")
 )
 
 # These will be on different scales but should be highly correlated

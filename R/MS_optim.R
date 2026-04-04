@@ -6,8 +6,9 @@
 #' @param jl.inputs Object from \code{\link{jl.prep}}. Supply when optimizing with Circuitscape via Julia.
 #' @param GA.inputs Object from \code{\link{GA.prep}}.
 #' @param diagnostic_plots Logical. Generate and save diagnostic plots? Default = \code{TRUE}.
-#' @return A named list with GA summary, MLPE model, AICc table, distance matrices,
-#'   percent contribution, and \code{k} table.
+#' @return An object of class \code{resga_ms_optim}: a named list with GA
+#'   summary, MLPE model, AICc table, distance matrices, percent contribution,
+#'   and \code{k} table.
 #' @usage MS_optim(gdist.inputs = NULL, jl.inputs = NULL, GA.inputs, diagnostic_plots = TRUE)
 
 #' @export
@@ -34,7 +35,7 @@
 #'
 #' ms.out <- MS_optim(
 #'   gdist.inputs = gdist.inputs,
-#'   GA.inputs = GA.inputs,
+#'   GA.inputs = GA.worker.inputs,
 #'   diagnostic_plots = FALSE
 #' )
 #' }
@@ -44,6 +45,7 @@ MS_optim <- function(gdist.inputs = NULL,
                      GA.inputs,
                      diagnostic_plots = TRUE) {
   k.value <- GA.inputs$k.value
+  GA.worker.inputs <- .rga_prepare_parallel_inputs(GA.inputs)
   wd <- getwd()
 
   # gdistance ---------------------------------------------------------------
@@ -67,7 +69,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -102,7 +104,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -139,7 +141,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -174,7 +176,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -232,7 +234,7 @@ MS_optim <- function(gdist.inputs = NULL,
       Combine_Surfaces(
         PARM = multi.GA_nG@solution,
         gdist.inputs = gdist.inputs,
-        GA.inputs = GA.inputs,
+        GA.inputs = GA.worker.inputs,
         rescale = TRUE,
         p.contribution = TRUE
       )
@@ -312,22 +314,7 @@ MS_optim <- function(gdist.inputs = NULL,
     #   ZZ = gdist.inputs$ZZ
     # )
     
-    if (k.value == 1) {
-      k <- 2
-    } else if (k.value == 2) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else if (k.value == 3) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else {
-      k <- length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    }
+    k <- .rga_multisurface_k(fit.mod, GA.inputs)
     
     n <- gdist.inputs$n.Pops
     aic <- (-2 * LL) + (2 * k)
@@ -337,7 +324,7 @@ MS_optim <- function(gdist.inputs = NULL,
     
     Result.txt(
       GA.results = multi.GA_nG,
-      GA.inputs = GA.inputs,
+      GA.inputs = GA.worker.inputs,
       method = gdist.inputs$method,
       Run.Time = rt,
       fit.stats = fit.stats,
@@ -361,12 +348,17 @@ MS_optim <- function(gdist.inputs = NULL,
     
     # unlink(GA.inputs$Write.dir, recursive = T, force = T)
     
-    k.df <- data.frame(surface = NAME, k = k)
+    k.df <- data.frame(
+      surface = NAME,
+      k = k,
+      fixed.effects = .rga_fixed_effect_label(fit.mod)
+    )
     
     cd.list <- list(as.matrix(cd))
     names(cd.list) <- NAME
     
     AICc.tab <- data.frame(surface = NAME,
+                           fixed.effects = .rga_fixed_effect_label(fit.mod),
                            obj = multi.GA_nG@fitnessValue,
                            k = k,
                            AIC = aic,
@@ -378,6 +370,7 @@ MS_optim <- function(gdist.inputs = NULL,
     colnames(AICc.tab) <-
       c(
         "Surface",
+        "Fixed.Effects",
         paste0("obj.func_", GA.inputs$method),
         "k",
         "AIC",
@@ -395,6 +388,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   }
   
@@ -421,7 +415,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           jl.inputs = jl.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -456,7 +450,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           jl.inputs = jl.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -493,7 +487,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           jl.inputs = jl.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -528,7 +522,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.inputs,
+          GA.inputs = GA.worker.inputs,
           jl.inputs = jl.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -584,7 +578,7 @@ MS_optim <- function(gdist.inputs = NULL,
       Combine_Surfaces(
         PARM = multi.GA_nG@solution,
         jl.inputs = jl.inputs,
-        GA.inputs = GA.inputs,
+        GA.inputs = GA.worker.inputs,
         rescale = TRUE,
         p.contribution = TRUE
       )
@@ -697,22 +691,7 @@ MS_optim <- function(gdist.inputs = NULL,
     
     MLPE.model <- fit.mod
     
-    if (k.value == 1) {
-      k <- 2
-    } else if (k.value == 2) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else if (k.value == 3) {
-      k <- sum(GA.inputs$parm.type$n.parm) + 
-        length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    } else {
-      k <- length(GA.inputs$layer.names) + 
-        length(lme4::fixef(fit.mod)) - 1
-      
-    }
+    k <- .rga_multisurface_k(fit.mod, GA.inputs)
     
     n <- jl.inputs$n.Pops
     aic <- (-2 * LL) + (2 * k)
@@ -722,7 +701,7 @@ MS_optim <- function(gdist.inputs = NULL,
     
     Result.txt(
       GA.results = multi.GA_nG,
-      GA.inputs = GA.inputs,
+      GA.inputs = GA.worker.inputs,
       method = "CIRCUITSCAPE.jl",
       Run.Time = rt,
       fit.stats = fit.stats,
@@ -746,12 +725,17 @@ MS_optim <- function(gdist.inputs = NULL,
     
     # unlink(GA.inputs$Write.dir, recursive = T, force = T)
     
-    k.df <- data.frame(surface = NAME, k = k)
+    k.df <- data.frame(
+      surface = NAME,
+      k = k,
+      fixed.effects = .rga_fixed_effect_label(fit.mod)
+    )
     
     cd.list <- list(as.matrix(cd))
     names(cd.list) <- NAME
     
     AICc.tab <- data.frame(surface = NAME,
+                           fixed.effects = .rga_fixed_effect_label(fit.mod),
                            obj = multi.GA_nG@fitnessValue,
                            k = k,
                            AIC = aic,
@@ -763,6 +747,7 @@ MS_optim <- function(gdist.inputs = NULL,
     colnames(AICc.tab) <-
       c(
         "Surface",
+        "Fixed.Effects",
         paste0("obj.func_", GA.inputs$method),
         "k",
         "AIC",
@@ -782,6 +767,7 @@ MS_optim <- function(gdist.inputs = NULL,
                 percent.contribution = p.cont,
                 k = k.df)
     
+    out <- resga_add_class(out, "resga_ms_optim")
     return(out)
   } # End Julia
 } # End function

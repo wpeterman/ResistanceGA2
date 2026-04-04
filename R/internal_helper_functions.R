@@ -690,6 +690,8 @@ Result.txt <-
            AICc,
            LL,
            fit.mod_REML = NULL) {
+    run_time_minutes <- signif(as.numeric(Run.Time) / 60, 6)
+
     if(inherits(GA.results, 'ga')) {
       summary.file <-
         paste0(GA.inputs$Results.dir, "Multisurface_Optim_Summary.txt")
@@ -741,7 +743,7 @@ Result.txt <-
         cat("\n")
         cat("\n")
       }
-      cat(paste0("Optimization took ", Run.Time, " seconds to complete"),
+      cat(paste0("Optimization took ", run_time_minutes, " minutes to complete"),
           "\n")
       sink()
     } else {
@@ -790,7 +792,7 @@ Result.txt <-
       cat(paste0("Optimized values for each surface:"), "\n")
       cat(GA.results@solution, "\n")
       cat("\n")
-      cat(paste0("Optimization took ", Run.Time, " seconds to complete"),
+      cat(paste0("Optimization took ", run_time_minutes, " minutes to complete"),
           "\n")
       sink()
     }

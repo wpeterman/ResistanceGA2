@@ -16,8 +16,9 @@ MS_optim(gdist.inputs = NULL, jl.inputs = NULL, GA.inputs, diagnostic_plots = TR
 \item{diagnostic_plots}{Logical. Generate and save diagnostic plots? Default = \code{TRUE}.}
 }
 \value{
-A named list with GA summary, MLPE model, AICc table, distance matrices,
-  percent contribution, and \code{k} table.
+An object of class \code{resga_ms_optim}: a named list with GA
+  summary, MLPE model, AICc table, distance matrices, percent contribution,
+  and \code{k} table.
 }
 \description{
 Optimize multiple resistance surfsaces simultaneously using genetic algorithms
@@ -43,7 +44,7 @@ GA.inputs <- GA.prep(
 
 ms.out <- MS_optim(
   gdist.inputs = gdist.inputs,
-  GA.inputs = GA.inputs,
+  GA.inputs = GA.worker.inputs,
   diagnostic_plots = FALSE
 )
 }

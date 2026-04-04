@@ -46,6 +46,7 @@
 #' by Circuitscape are written to temporary files internally for each run.
 #'
 #' @export
+#' @importFrom utils capture.output
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #'
 #' @examples
@@ -251,7 +252,8 @@ Run_CS.jl <- function(jl.inputs        = NULL,
     if (!file.exists(cur_file) && !is.null(scratch)) {
       cur_file <- normalizePath(paste0(scratch, "/", tmp.name, "_cum_curmap.asc"))
     }
-    rast_out      <- terra::rast(cur_file)
+    rast_out <- terra::rast(cur_file)
+    terra::values(rast_out) <- terra::values(rast_out)
     names(rast_out) <- File.name
 
     if (isTRUE(rm.files)) {
