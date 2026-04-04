@@ -2,7 +2,7 @@
 % Please edit documentation in R/MLPE.R
 \name{MLPE.lmm}
 \alias{MLPE.lmm}
-\title{Run maximum likelihood population effects mixed effects model (MLPE)}
+\title{Legacy convenience wrapper for a single MLPE resistance predictor}
 \usage{
 MLPE.lmm(resistance, 
                 pairwise.genetic, 
@@ -29,7 +29,12 @@ vector, matrix, or \code{dist} object of pairwise resistance distances.}
 A lmer object from the fitted model
 }
 \description{
-Runs MLPE as detailed by Clarke et al. (2002). This function will run the model and return lmer object
+This function accepts a vector, matrix, \code{dist} object, or file path for a
+single pairwise resistance-distance predictor and fits a one-predictor MLPE
+model. It is retained for backward compatibility. For new analyses, prefer
+\code{\link[ResistanceGA2]{mlpe_data}} and \code{\link[ResistanceGA2]{mlpe}},
+which support explicit endpoint-pair columns, omitted observations, and
+multiple dyadic random-intercept terms.
 }
 \details{
 An AIC value will only be returned if \code{REML = FALSE}
@@ -50,3 +55,4 @@ Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regre
 \author{
 Bill Peterman <Peterman.73@osu.edu>
 }
+\keyword{internal}

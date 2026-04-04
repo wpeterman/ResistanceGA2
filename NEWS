@@ -1,3 +1,8 @@
+ResistanceGA2 1.1.7
+---------
+* Clarified that mlpe and mlpe_data are the preferred standalone MLPE API
+* Marked mlpe_rga, MLPE.lmm, and To.From.ID as legacy compatibility helpers in documentation
+
 ResistanceGA2 1.1.6
 ---------
 * Fixed recursive printing of bootstrap tables in all_comb and bootstrap summaries

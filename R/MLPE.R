@@ -1,7 +1,12 @@
 # Run Mixed effects models, recover parameter estimates
-#' Run maximum likelihood population effects mixed effects model (MLPE)
+#' Legacy convenience wrapper for a single MLPE resistance predictor
 #'
-#' Runs MLPE as detailed by Clarke et al. (2002). This function will run the model and return lmer object
+#' This function accepts a vector, matrix, \code{dist} object, or file path for a
+#' single pairwise resistance-distance predictor and fits a one-predictor MLPE
+#' model. It is retained for backward compatibility. For new analyses, prefer
+#' \code{\link[ResistanceGA2]{mlpe_data}} and \code{\link[ResistanceGA2]{mlpe}},
+#' which support explicit endpoint-pair columns, omitted observations, and
+#' multiple dyadic random-intercept terms.
 #'
 #' @param resistance Path to a Circuitscape resistance output file, or a
 #'   vector, matrix, or \code{dist} object of pairwise resistance distances.
@@ -14,6 +19,7 @@
 #' @details An AIC value will only be returned if \code{REML = FALSE}
 
 #' @export
+#' @keywords internal
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' @usage MLPE.lmm(resistance, 
 #'                 pairwise.genetic, 

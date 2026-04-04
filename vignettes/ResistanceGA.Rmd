@@ -64,11 +64,12 @@ genetic_distance ~ resistance_distance + (1 | pop)
 
 The dyadic random effect `(1 | pop)` is a structural component of MLPE. It is constructed automatically from the endpoint columns in the pairwise data. Users do not need to build a `ZZ` matrix or call `To.From.ID()` directly when using the main optimization functions or the new MLPE interface.
 
-`ResistanceGA2` provides two interfaces for fitting MLPE models directly:
+`ResistanceGA2` provides a dyad-aware interface for fitting MLPE models directly:
 
-- **`mlpe(formula, data, pairs, ...)`**: A formula-based interface that mirrors `lme4`. The `pairs` argument specifies which columns in `data` hold the site endpoint labels; the dyadic random effect covariance structure is built automatically. Use this for standalone model fitting and baseline comparisons.
-- **`mlpe_data(response, ..., pairs, labels)`**: Constructs a pairwise data frame by combining a response vector with named covariate vectors (IBD, IBE, etc.), generating from and to endpoint columns from optional site labels. The result is ready to pass directly to `mlpe()`.
-- **`mlpe_rga(formula, data, ...)`**: The original ZZ-matrix interface retained for backward compatibility and for use inside `gdist.prep()`/`jl.prep()` covariate workflows.
+- **`mlpe_data(response, ..., pairs, labels)`** constructs a pairwise data frame by combining a response vector with named covariate vectors (IBD, IBE, etc.) and from/to endpoint columns.
+- **`mlpe(formula, data, pairs, ...)`** then fits the MLPE model using `lme4`-style syntax while building the dyadic random-effect covariance from those endpoint columns automatically.
+
+The older `mlpe_rga()`, `MLPE.lmm()`, and `To.From.ID()` functions remain in the package for backward compatibility and internal optimization workflows, but they are no longer the recommended API for new standalone analyses.
 
 For a worked example of the `mlpe()`/`mlpe_data()` interface in a joint IBD/IBE/IBR context, see the `IBE_IBR_Framework` vignette.
 

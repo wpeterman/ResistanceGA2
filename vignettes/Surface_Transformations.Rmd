@@ -451,7 +451,7 @@ ga_inputs_check$surface.type
 
 - Visualizing what a particular parameter set looks like on the landscape.
 - Applying the optimal parameters from an optimization run to generate the final resistance surface.
-- Creating transformed surfaces for use in custom MLPE models via `mlpe_rga()`.
+- Creating transformed surfaces for use in custom MLPE models via `mlpe_data()` and `mlpe()`.
 
 ```{r resistance-tran-examples}
 # Monomolecular transformation

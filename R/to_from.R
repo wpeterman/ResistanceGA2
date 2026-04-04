@@ -1,5 +1,5 @@
 # Make to-from population list
-#' Convenience function to make to-from object needed for specifying MLPE random effects
+#' Legacy to-from ID constructor for pairwise MLPE workflows
 #'
 #' @param sampled_pops Integer. Number of populations (or individuals) sampled.
 #' @param pop_n Integer vector of length \code{sampled_pops} giving the number
@@ -15,6 +15,14 @@
 #' @return A data frame of population pairs for use as the MLPE random effect.
 #'
 #' @details
+#' This helper is retained for backward compatibility and internal preparation
+#' workflows. For new standalone MLPE analyses, users generally do not need to
+#' call \code{To.From.ID()} directly; instead, pass endpoint columns through
+#' \code{\link[ResistanceGA2]{mlpe_data}} and
+#' \code{\link[ResistanceGA2]{mlpe}}, or use
+#' \code{\link[ResistanceGA2]{gdist.prep}}/\code{\link[ResistanceGA2]{jl.prep}}
+#' for optimization workflows.
+#'
 #' Distance values must come from the lower half of a distance matrix; use
 #' \code{\link[ResistanceGA2]{lower}} to extract them. When fitting a MLPE
 #' model with \code{\link[ResistanceGA2]{mlpe_rga}}, add \code{pop1} from this
@@ -35,6 +43,7 @@
 #' To.From.ID(sampled_pops = 4, spLoc = spLoc, nb = 3)
 #'
 #' @export
+#' @keywords internal
 #' @author Bill Peterman <Peterman.73@@osu.edu>
 #' @usage To.From.ID(sampled_pops,
 #'                   pop_n = NULL,
