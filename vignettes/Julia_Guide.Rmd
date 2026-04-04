@@ -203,10 +203,10 @@ names(jl_inputs)
 
 | Parameter | Default | Description |
 |---|---|---|
-| `n.Pops` | — | Number of sample populations |
+| `n.Pops` | required | Number of sample populations |
 | `response` | NULL | Pairwise genetic distances (vector from `lower()`) |
-| `CS_Point.File` | — | `SpatVector` of sample point locations |
-| `JULIA_HOME` | — | Path to Julia `bin/` directory |
+| `CS_Point.File` | required | `SpatVector` of sample point locations |
+| `JULIA_HOME` | required | Path to Julia `bin/` directory |
 | `run_test` | FALSE | Run a test Circuitscape calculation to verify setup |
 | `silent` | FALSE | Suppress Julia startup messages |
 | `cholmod` | TRUE | Use CHOLMOD direct solver (faster, more memory) |
@@ -280,8 +280,8 @@ Circuitscape support files.
 
 | Parameter | Default | Description |
 |---|---|---|
-| `jl.inputs` | — | Output of `jl.prep()` |
-| `r` | — | `SpatRaster` resistance surface |
+| `jl.inputs` | required | Output of `jl.prep()` |
+| `r` | required | `SpatRaster` resistance surface |
 | `CurrentMap` | FALSE | Compute cumulative current map in addition to pairwise distances |
 | `output` | `"matrix"` | `"matrix"` for pairwise distances; `"raster"` for current map |
 | `EXPORT.dir` | NULL | Directory for output files when `output = "raster"` |

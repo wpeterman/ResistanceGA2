@@ -48,6 +48,7 @@ resga_direction <- function(metric) {
 }
 
 resga_rank_table <- function(x, preferred) {
+  x <- resga_plain_table(x)
   metric <- resga_pick_column(x, preferred)
 
   if (is.null(metric)) {
@@ -71,7 +72,24 @@ resga_rank_table <- function(x, preferred) {
 }
 
 resga_head_table <- function(x, n = 6L) {
-  utils::head(x, n = max(1L, as.integer(n)))
+  utils::head(resga_plain_table(x), n = max(1L, as.integer(n)))
+}
+
+resga_plain_table <- function(x) {
+  if (!is.data.frame(x)) {
+    return(x)
+  }
+
+  class(x) <- setdiff(
+    class(x),
+    grep("^(resga_|summary\\.resga_)", class(x), value = TRUE)
+  )
+
+  if (length(class(x)) == 0) {
+    class(x) <- "data.frame"
+  }
+
+  x
 }
 
 resga_minutes <- function(seconds) {

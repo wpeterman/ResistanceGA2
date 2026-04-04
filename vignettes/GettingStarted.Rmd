@@ -204,8 +204,8 @@ Key arguments to know:
 
 | Argument | Default | Purpose |
 |---|---|---|
-| `raster` | — | `SpatRaster` with one layer per surface hypothesis |
-| `Results.dir` | — | Directory where tables and plots will be saved |
+| `raster` | required | `SpatRaster` with one layer per surface hypothesis |
+| `Results.dir` | required | Directory where tables and plots will be saved |
 | `method` | `"LL"` | Objective function: `"LL"`, `"AIC"`, or `"R2"` |
 | `select.trans` | auto | List of transformation families per layer (`"M"`, `"R"`, `"A"`, or `NA` for categorical) |
 | `pop.size` | 50 | GA population size (individuals per generation) |
@@ -252,15 +252,15 @@ jl_inputs <- jl.prep(
 )
 ```
 
-> **Note:** You only need to prepare *one* distance engine — gdistance or Julia, not both. For iterative optimization over many surfaces, `gdistance` is usually faster. For final Circuitscape-matched outputs or current maps, use Julia.
+> **Note:** You only need to prepare *one* distance engine (gdistance or Julia, not both). For iterative optimization over many surfaces, `gdistance` is usually faster. For final Circuitscape-matched outputs or current maps, use Julia.
 
 ## Step 3: Run Optimization
 
 With both `ga_inputs` and a distance engine object ready, call the appropriate optimization function:
 
-- `SS_optim()` — optimize each surface individually (single-surface)
-- `MS_optim()` — optimize all surfaces simultaneously as a composite (multi-surface)
-- `all_comb()` — systematically test all combinations of surfaces up to a specified size
+- `SS_optim()`: optimize each surface individually (single-surface)
+- `MS_optim()`: optimize all surfaces simultaneously as a composite (multi-surface)
+- `all_comb()`: systematically test all combinations of surfaces up to a specified size
 
 ```{r ss-optim-eval, eval=FALSE}
 # Single-surface optimization (one run per layer)
@@ -271,9 +271,9 @@ ss_out <- SS_optim(
   null_mod        = TRUE,   # also fit a null (intercept-only) model
   diagnostic_plots = FALSE
 )
+```
 
-The returned object now has an S3 class with built-in `print()`, `summary()`,
-and `plot()` methods.
+The returned object has an S3 class with built-in `print()`, `summary()`, and `plot()` methods:
 
 ```{r ss-s3, eval=FALSE}
 class(ss_out)
@@ -309,10 +309,10 @@ For a full worked example with precomputed results, see the `ResistanceGA` vigne
 
 Optimization functions return structured lists. The most important components are:
 
-- `$AICc` — model comparison table with AIC, AICc, R^2^~m~, R^2^~c~, LL, and k values
-- `$ContinuousResults` / `$CategoricalResults` — optimized parameter estimates
-- `$cd` — list of pairwise distance matrices for the winning surfaces
-- `$MLPE.list` — fitted MLPE model objects for downstream inference
+- `$AICc`: model comparison table with AIC, AICc, R^2^~m~, R^2^~c~, LL, and k values
+- `$ContinuousResults` / `$CategoricalResults`: optimized parameter estimates
+- `$cd`: list of pairwise distance matrices for the winning surfaces
+- `$MLPE.list`: fitted MLPE model objects for downstream inference
 
 ```{r results-preview, eval=FALSE}
 # View model comparison table
@@ -389,7 +389,7 @@ checking for consistency in the top-supported surfaces and parameter estimates.
 
 **k.value:** A user-selected rule for counting the number of parameters in the AIC/AICc calculation. Different defensible choices exist; the default (`k.value = 2`) should be reported in publications.
 
-**IBD / IBR / IBE:** Isolation by Distance / Resistance / Environment — three competing (and complementary) hypotheses about the drivers of spatial genetic structure.
+**IBD / IBR / IBE:** Isolation by Distance / Resistance / Environment. Three competing (and complementary) hypotheses about the drivers of spatial genetic structure.
 
 ---
 
@@ -441,4 +441,4 @@ Peterman, W. E., G. M. Connette, R. D. Semlitsch, and L. S. Eggert. 2014. Ecolog
 
 McRae, B. H. 2006. Isolation by resistance. *Evolution* 60:1551–1561.
 
-Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* 24:e13831.

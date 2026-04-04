@@ -1,3 +1,11 @@
+ResistanceGA2 1.1.6
+---------
+* Fixed recursive printing of bootstrap tables in all_comb and bootstrap summaries
+
+ResistanceGA2 1.1.5
+---------
+* Fixed all_comb bootstrap metadata alignment when Null models are included
+
 ResistanceGA2 1.1.4
 ---------
 * Integrated the dyad-aware MLPE interface and pairwise environmental helper workflow into main

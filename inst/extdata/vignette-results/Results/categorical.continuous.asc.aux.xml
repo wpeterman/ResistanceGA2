@@ -2,7 +2,7 @@
   <PAMRasterBand band="1">
     <Description>categorical.continuous</Description>
     <Metadata>
-      <MDI key="STATISTICS_MAXIMUM">432.83038330078</MDI>
+      <MDI key="STATISTICS_MAXIMUM">14.663964271545</MDI>
       <MDI key="STATISTICS_MEAN">-9999</MDI>
       <MDI key="STATISTICS_MINIMUM">1</MDI>
       <MDI key="STATISTICS_STDDEV">-9999</MDI>

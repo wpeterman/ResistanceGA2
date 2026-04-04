@@ -440,6 +440,15 @@ all_comb <- function(gdist.inputs = NULL,
         }
         
         all.cd[[(j + n_ss.cd)]] <- ms.results[[j]]$cd[[1]]
+        ms.cd.names <- names(ms.results[[j]]$cd)
+        ms.cd.name <- ""
+        if (!is.null(ms.cd.names) && length(ms.cd.names) > 0) {
+          ms.cd.name <- ms.cd.names[[1]]
+        }
+        if (is.null(ms.cd.name) || !nzchar(ms.cd.name) || ms.cd.name == "NULL") {
+          ms.cd.name <- as.character(ms.results[[j]]$k$surface[[1]])
+        }
+        names(all.cd)[[j + n_ss.cd]] <- ms.cd.name
         
         ms.k[[j]] <- ms.results[[j]]$k
         
@@ -456,8 +465,33 @@ all_comb <- function(gdist.inputs = NULL,
       all.AICc <- rbind(ss.results$AICc,
                         plyr::ldply(AICc.tab_list))
     }
+
+    all.cd.names <- names(all.cd)
+    if (is.null(all.cd.names)) {
+      all.cd.names <- rep("", length(all.cd))
+    }
+
+    unnamed.cd <- which(is.na(all.cd.names) |
+                          !nzchar(all.cd.names) |
+                          all.cd.names == "NULL")
+    if (length(unnamed.cd) > 0) {
+      candidate.names <- as.character(all.k$surface)
+      candidate.names <- candidate.names[nzchar(candidate.names) &
+                                           candidate.names != "Null"]
+      if (length(candidate.names) == length(all.cd)) {
+        all.cd.names[unnamed.cd] <- candidate.names[unnamed.cd]
+        names(all.cd) <- all.cd.names
+      }
+    }
     
-    names(all.cd) <- all.k$surface
+    boot.k <- all.k[match(names(all.cd), all.k$surface), , drop = FALSE]
+
+    if(anyNA(boot.k$surface) || nrow(boot.k) != length(all.cd)) {
+      stop(
+        "Failed to align optimized distance matrices with model metadata in ",
+        "`all_comb()`. Please check single- and multi-surface outputs."
+      )
+    }
     
     all.AICc <- all.AICc %>% 
       dplyr::arrange(., AICc) %>%
@@ -472,9 +506,9 @@ all_comb <- function(gdist.inputs = NULL,
       genetic.mat <- matrix(0, obs, obs)
       genetic.mat[lower.tri(genetic.mat)] <- gdist.inputs$response
       
-      boot.results <- Resist.boot(mod.names = all.k[,1],
+      boot.results <- Resist.boot(mod.names = boot.k[,1],
                                   dist.mat = all.cd,
-                                  n.parameters = all.k[,2],
+                                  n.parameters = boot.k[,2],
                                   sample.prop = sample.prop,
                                   iters = iters,
                                   obs = obs,
@@ -484,9 +518,9 @@ all_comb <- function(gdist.inputs = NULL,
       genetic.mat <- matrix(0, obs, obs)
       genetic.mat[lower.tri(genetic.mat)] <- jl.inputs$response.all
       
-      boot.results <- Resist.boot(mod.names = all.k[,1],
+      boot.results <- Resist.boot(mod.names = boot.k[,1],
                                   dist.mat = all.cd,
-                                  n.parameters = all.k[,2],
+                                  n.parameters = boot.k[,2],
                                   sample.prop = sample.prop,
                                   iters = iters,
                                   obs = obs,

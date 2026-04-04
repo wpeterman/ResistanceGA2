@@ -62,7 +62,15 @@ Standard regression models cannot be applied directly to pairwise genetic and la
 genetic_distance ~ resistance_distance + (1 | pop)
 ```
 
-The random effect `pop` is derived from `To.From.ID()`, which generates the population-level grouping structure from the pairwise observation indices. The `ZZ` matrix that defines the MLPE random effect structure is created internally; users do not need to construct it manually when using `SS_optim()`, `MS_optim()`, or `all_comb()`. When using `mlpe_rga()` directly, `ZZ` is also created automatically from the number of rows in the data frame.
+The dyadic random effect `(1 | pop)` is a structural component of MLPE. It is constructed automatically from the endpoint columns in the pairwise data. Users do not need to build a `ZZ` matrix or call `To.From.ID()` directly when using the main optimization functions or the new MLPE interface.
+
+`ResistanceGA2` provides two interfaces for fitting MLPE models directly:
+
+- **`mlpe(formula, data, pairs, ...)`**: A formula-based interface that mirrors `lme4`. The `pairs` argument specifies which columns in `data` hold the site endpoint labels; the dyadic random effect covariance structure is built automatically. Use this for standalone model fitting and baseline comparisons.
+- **`mlpe_data(response, ..., pairs, labels)`**: Constructs a pairwise data frame by combining a response vector with named covariate vectors (IBD, IBE, etc.), generating from and to endpoint columns from optional site labels. The result is ready to pass directly to `mlpe()`.
+- **`mlpe_rga(formula, data, ...)`**: The original ZZ-matrix interface retained for backward compatibility and for use inside `gdist.prep()`/`jl.prep()` covariate workflows.
+
+For a worked example of the `mlpe()`/`mlpe_data()` interface in a joint IBD/IBE/IBR context, see the `IBE_IBR_Framework` vignette.
 
 ---
 
@@ -99,7 +107,7 @@ There is no universally correct choice. `k.value = 2` is a practical starting po
 
 For continuous surfaces, the GA searches a two-dimensional space: the shape parameter and the maximum resistance parameter of a chosen transformation family. The choice of transformation families to include in the search is controlled by `select.trans` in `GA.prep()`.
 
-The default behavior includes all Monomolecular families (`"M"`) for continuous layers and assigns `NA` (no transformation, class-specific values) for categorical layers. Adding Ricker families (`"A"` for all, or `"R"` for Ricker only) increases search space and flexibility but also increases the risk of overfitting — Ricker curves can approximate almost any monotone shape when the shape parameter is extreme, at the cost of less interpretable parameters.
+The default behavior includes all Monomolecular families (`"M"`) for continuous layers and assigns `NA` (no transformation, class-specific values) for categorical layers. Adding Ricker families (`"A"` for all, or `"R"` for Ricker only) increases search space and flexibility but also increases the risk of overfitting; Ricker curves can approximate almost any monotone shape when the shape parameter is extreme, at the cost of less interpretable parameters.
 
 > **Recommendation:** Start with `select.trans = list("M")` for continuous layers. Only include Ricker families if you have a biological hypothesis about a peaked or threshold-type resistance response. See the `Surface_Transformations` vignette for a detailed discussion.
 
@@ -251,8 +259,8 @@ knitr::kable(
 The AICc table compares all surfaces tested plus the null and distance reference models. Columns:
 
 - **AIC / AICc**: Akaike Information Criteria (corrected for small samples). Lower = better.
-- **R2m**: Marginal R^2^ — variance explained by fixed effects (resistance distance) alone.
-- **R2c**: Conditional R^2^ — variance explained by fixed + random effects combined.
+- **R2m**: Marginal R^2^, variance explained by fixed effects (resistance distance) alone.
+- **R2c**: Conditional R^2^, variance explained by fixed and random effects combined.
 - **LL**: Log-likelihood. Higher = better fit.
 - **k**: Number of parameters counted (governed by `k.value` in `GA.prep()`).
 
@@ -279,7 +287,7 @@ For categorical surfaces, class-specific resistance values are returned in `$Cat
 
 ## Interpreting SS_optim Output
 
-The single-surface results tell you, for each landscape variable tested in isolation, how much explanatory power it contributes to pairwise genetic distances. A surface with a substantially lower AICc than the null model is worth investigating further. A surface that does not improve on the null — or that is outperformed by the simple geographic distance (IBD) model — may not be an important driver of genetic structure for this system.
+The single-surface results tell you, for each landscape variable tested in isolation, how much explanatory power it contributes to pairwise genetic distances. A surface with a substantially lower AICc than the null model is worth investigating further. A surface that does not improve on the null, or that is outperformed by the simple geographic distance (IBD) model, may not be an important driver of genetic structure for this system.
 
 Key interpretation points:
 
@@ -299,13 +307,13 @@ Key interpretation points:
 
 ## Running MS_optim
 
-`MS_optim()` simultaneously optimizes the transformation parameters for all surface layers and estimates their relative contributions to a single composite resistance surface. The composite is a weighted linear combination:
+`MS_optim()` simultaneously optimizes the transformation parameters for all surface layers and estimates their relative contributions to a single composite resistance surface. The composite is a linear combination of functional transformations defining the maximum resistance and pattern of change:
 
 ```
-composite_resistance = w1 * surface1_transformed + w2 * surface2_transformed + ...
+composite_resistance = f(surface1_transformed) + f(surface2_transformed) + ...
 ```
 
-where the weights (contributions) are also estimated by the GA.
+where the transformations are also estimated by the GA.
 
 ```{r ms-optim-code, eval=FALSE}
 ms_out <- MS_optim(
@@ -364,7 +372,7 @@ if (!is.null(ms_out$percent.contribution)) {
 }
 ```
 
-Percent contribution reflects the relative weight of each surface in the optimized composite. A surface with 70% contribution dominates the composite; a surface with 5% contribution has little influence. However, note that these percentages are sensitive to scaling and the correlation structure among surfaces. They should be interpreted as a rough guide to relative importance, not as precise effect sizes.
+Percent contribution reflects the relative weight of each surface in the optimized composite. A surface with 90% contribution dominates the composite; a surface with 10% contribution has little influence. However, note that these percentages are sensitive to scaling and the correlation structure among surfaces. They should be interpreted as a rough guide to relative importance, not as precise effect sizes.
 
 ## Reconstructing the Composite Surface
 
@@ -463,7 +471,7 @@ Single-run optimization results depend on the stochastic nature of the GA and th
 
 ## Running Resist.boot
 
-`Resist.boot()` resamples the pairwise observations to assess how consistently each surface ranks highly across subsampled datasets. When you use `all_comb()`, bootstrap is run automatically and the results are stored in `combo_out$boot.results` — you do not need to call `Resist.boot()` separately.
+`Resist.boot()` resamples the pairwise observations to assess how consistently each surface ranks highly across subsampled datasets. When you use `all_comb()`, bootstrap is run automatically and the results are stored in `combo_out$boot.results`; you do not need to call `Resist.boot()` separately.
 
 If you want to run bootstrap directly after `SS_optim()` and `MS_optim()` (without `all_comb()`), you must build the distance matrix list and k vector from those outputs:
 
@@ -518,17 +526,13 @@ knitr::kable(
 
 ## Interpreting Bootstrap Results
 
-If you want direct `.ini`-style access to Circuitscape from R, use
-`Run_CS.ini()` instead of `Run_CS.jl()`. That lower-level wrapper is described
-in the `Direct Circuitscape Runs from R` vignette.
-
 The `Resist.boot()` output is a tibble with one row per surface combination. Key columns:
 
 | Column | Interpretation |
 |---|---|
 | `surface` | Surface combination label |
 | `avg.AICc` | Mean AICc across bootstrap replicates |
-| `avg.weight` | Mean AIC weight — ranges 0 to 1, higher = more support |
+| `avg.weight` | Mean AIC weight (0 to 1); higher values indicate more support |
 | `avg.rank` | Mean rank across replicates (1 = best) |
 | `avg.R2m` | Mean marginal R^2^ |
 | `avg.LL` | Mean log-likelihood |
@@ -619,7 +623,7 @@ Diagnostic.Plots(
 
 # References
 
-Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* (early view).
+Beninde, J., et al. 2024. Optimizing resistance surfaces in landscape genetics: pitfalls of R-squared and best practices for objective functions. *Molecular Ecology Resources* 24:e13831.
 
 Clarke, R. T., P. Rothery, and A. F. Raybould. 2002. Confidence limits for regression relationships between distance matrices: Estimating gene flow with distance. *Journal of Agricultural, Biological, and Environmental Statistics* 7:361–372.
 

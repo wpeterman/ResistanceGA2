@@ -296,6 +296,7 @@ test_that("Resist.boot ranks simple candidate distance matrices", {
   boot_summary <- summary(boot_out)
   expect_s3_class(boot_summary, "summary.resga_bootstrap")
   expect_identical(boot_summary$best_surface, "model_1")
+  expect_output(print(boot_summary), "ResistanceGA2 bootstrap results")
 
   expect_no_error(with_test_plot(plot(boot_out)))
 })
@@ -464,4 +465,44 @@ test_that("Windows parallel MS_optim completes the multisurface covariate workfl
 
   expect_s3_class(ms_out, "resga_ms_optim")
   expect_true(nrow(ms_out$AICc.tab) >= 1L)
+})
+
+test_that("all_comb aligns bootstrap model metadata when Null is included", {
+  resistance_surfaces <- unwrap_raster(get_pkg_data("resistance_surfaces"))
+  inputs <- make_smoke_inputs(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    prefix = "all-comb-source-"
+  )
+
+  ga_inputs <- ResistanceGA2::GA.prep(
+    raster = terra::subset(resistance_surfaces, c("categorical", "continuous")),
+    Results.dir = "all.comb",
+    pop.size = 10,
+    maxiter = 1,
+    run = 1,
+    seed = 1,
+    parallel = FALSE,
+    monitor = FALSE,
+    quiet = TRUE
+  )
+
+  out_dir <- make_temp_dir("all-comb-results-")
+
+  combo_out <- ResistanceGA2::all_comb(
+    gdist.inputs = inputs$gdist,
+    GA.inputs = ga_inputs,
+    results.dir = out_dir,
+    max.combination = 2,
+    iters = 1,
+    replicate = 1,
+    dist_mod = TRUE,
+    null_mod = TRUE
+  )
+
+  expect_s3_class(combo_out, "resga_all_comb")
+  expect_true("Null" %in% combo_out$summary.table$Surface)
+  expect_false("Null" %in% names(combo_out$all.cd))
+  expect_setequal(names(combo_out$all.cd), combo_out$boot.results$surface)
+  expect_true(all(names(combo_out$all.cd) %in% combo_out$all.k$surface))
+  expect_output(print(summary(combo_out)), "Bootstrap support")
 })
