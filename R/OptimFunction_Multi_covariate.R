@@ -72,9 +72,9 @@ Resistance.Opt_multi.cov <- function(PARM,
         dat$cd <- scale(c(cd))
 
         fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
-                            data    = dat,
-                            ZZ      = gdist.inputs$ZZ,
-                            REML    = FALSE)
+                                 data    = dat,
+                                 ZZ      = gdist.inputs$ZZ,
+                                 REML    = FALSE)
 
         if (lme4::fixef(fit.mod)["cd"] >= 0) {
           obj.func.opt <- .obj_value(fit.mod, method)
@@ -109,9 +109,9 @@ Resistance.Opt_multi.cov <- function(PARM,
         }
 
         fit.mod <- mlpe_rga(formula = jl.inputs$formula,
-                            data    = dat,
-                            ZZ      = jl.inputs$ZZ,
-                            REML    = FALSE)
+                                 data    = dat,
+                                 ZZ      = jl.inputs$ZZ,
+                                 REML    = FALSE)
 
         if (lme4::fixef(fit.mod)["cd"] >= 0) {
           obj.func.opt <- .obj_value(fit.mod, method)

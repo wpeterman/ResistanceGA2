@@ -60,7 +60,17 @@ Diagnostic.Plots <-
       
       cs.matrix <- scale(mm, center = TRUE, scale = TRUE)
       cs.unscale <- mm
-      dat <- data.frame(pop = ID$pop1, cd = cs.matrix, gd = response)
+      dat <- data.frame(pop1 = ID$pop1,
+                        pop2 = ID$pop2,
+                        cd = cs.matrix,
+                        gd = response)
+      dat <- .mlpe_attach_workflow_pairs(dat, ID)
+      formula <- .mlpe_formula_from_data(
+        data = dat,
+        response = "gd",
+        predictor = "cd",
+        fallback = gd ~ cd + (1 | pop1)
+      )
       # dat <- data.frame(ID, cs.matrix = cs.matrix, response = response)
       # colnames(dat) <- c("pop1", "pop2", "cs.matrix", "response")
       
@@ -68,10 +78,10 @@ Diagnostic.Plots <-
       # LAYER <- assign("LAYER", value = dat$cs.matrix)
       
       # Fit model
-      Mod <- mlpe_rga(gd ~ cd + (1 | pop),
-                      data = dat,
-                      REML = TRUE,
-                      ZZ = ZZ)
+      Mod <- .rga_fit_mlpe(formula = formula,
+                           data = dat,
+                           REML = TRUE,
+                           ZZ = ZZ)
       # mod <- lFormula(response ~ LAYER + (1 | pop1),
       #                 data = dat,
       #                 REML = TRUE)
@@ -102,17 +112,27 @@ Diagnostic.Plots <-
       }
       cs.matrix <- scale(mm, center = TRUE, scale = TRUE)
       cs.unscale <- mm
-      dat <- data.frame(pop = ID$pop1, cd = cs.matrix, gd = response)
+      dat <- data.frame(pop1 = ID$pop1,
+                        pop2 = ID$pop2,
+                        cd = cs.matrix,
+                        gd = response)
+      dat <- .mlpe_attach_workflow_pairs(dat, ID)
+      formula <- .mlpe_formula_from_data(
+        data = dat,
+        response = "gd",
+        predictor = "cd",
+        fallback = gd ~ cd + (1 | pop1)
+      )
       # colnames(dat) <- c("pop1", "pop2", "cs.matrix", "response")
       
       # Assign value to layer
       # LAYER <- assign("LAYER", value = dat$cs.matrix)
       
       # Fit model
-      Mod <- mlpe_rga(gd ~ cd + (1 | pop),
-                      data = dat,
-                      REML = TRUE,
-                      ZZ = ZZ)
+      Mod <- .rga_fit_mlpe(formula = formula,
+                           data = dat,
+                           REML = TRUE,
+                           ZZ = ZZ)
       #   mod <- lFormula(response ~ LAYER + (1 | pop1),
       #                   data = dat,
       #                   REML = TRUE)

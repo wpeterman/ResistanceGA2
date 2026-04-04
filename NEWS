@@ -1,3 +1,8 @@
+ResistanceGA2 1.1.8
+---------
+* Routed bootstrap, diagnostic, and legacy coefficient MLPE fits through the dyad-aware fitting backend
+* Preserved legacy MLPE.lmm numerical behavior while aligning workflow pair metadata with the new MLPE machinery
+
 ResistanceGA2 1.1.7
 ---------
 * Clarified that mlpe and mlpe_data are the preferred standalone MLPE API

@@ -48,6 +48,7 @@ MLPE.lmm <-
            ZZ = NULL,
            scale = TRUE) {
     response = pairwise.genetic
+    use_legacy_structure <- !is.null(ID) || !is.null(ZZ)
     
     if (class(resistance)[[1]] == 'dist') {
       mm <- as.vector(resistance)
@@ -112,14 +113,23 @@ MLPE.lmm <-
       }
     }
     
-    if (is.null(ID) && is.null(ZZ)) {
-      dat <- mlpe_data(response = response, resistance = cs.matrix)
+    if (!use_legacy_structure) {
+      dat <- data.frame(ID, resistance = c(cs.matrix), response = response)
+      colnames(dat) <- c("pop1", "pop2", "resistance", "response")
+      dat <- .mlpe_attach_workflow_pairs(dat, ID)
+
+      formula <- .mlpe_formula_from_data(
+        data = dat,
+        response = "response",
+        predictor = "resistance",
+        fallback = response ~ resistance + (1 | pop1)
+      )
 
       return(
-        mlpe(
-          formula = response ~ resistance + (1 | pair),
+        .rga_fit_mlpe(
+          formula = formula,
           data = dat,
-          pairs = c("from", "to"),
+          ZZ = ZZ,
           REML = REML
         )
       )
@@ -153,29 +163,15 @@ MLPE.lmm2 <- function(resistance, response, REML = FALSE, ID, ZZ) {
   dat <- .mlpe_attach_workflow_pairs(dat, ID)
   pair_terms <- attr(dat, "mlpe_pairs", exact = TRUE)
 
-  if (is.list(pair_terms) && length(pair_terms) > 0L) {
-    formula <- .mlpe_formula_from_pair_terms("response",
-                                             "scale(resistance)",
-                                             pair_terms)
+  formula <- .mlpe_formula_from_data(data = dat,
+                                     response = "response",
+                                     predictor = "scale(resistance)",
+                                     fallback = response ~ scale(resistance) + (1 | pop1))
 
-    return(
-      mlpe_rga(formula = formula,
-               data = dat,
-               REML = REML,
-               ZZ = ZZ)
-    )
-  }
-
-  mod <-
-    lme4::lFormula(response ~ scale(resistance) + (1 | pop1),
-                   data = dat,
-                   REML = REML)
-  mod$reTrms$Zt <- ZZ
-  dfun <- do.call(lme4::mkLmerDevfun, mod)
-  opt <- lme4::optimizeLmer(dfun)
-  MOD <-
-    (lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
-  return(MOD)
+  .rga_fit_mlpe(formula = formula,
+                data = dat,
+                REML = REML,
+                ZZ = ZZ)
 }
 
 
@@ -212,10 +208,10 @@ MLPE.lmm_coef <-
           LAYER <- assign(resist.names[i], value = dat$cs.matrix)
           
           # Fit model
-          mod <- mlpe_rga(formula = formula,
-                          data = inputs$df,
-                          ZZ = inputs$ZZ,
-                          REML = TRUE)
+          mod <- .rga_fit_mlpe(formula = formula,
+                               data = inputs$df,
+                               ZZ = inputs$ZZ,
+                               REML = TRUE)
           
           Mod.Summary <- summary(mod)
           COEF <- Mod.Summary$coefficients
@@ -251,10 +247,10 @@ MLPE.lmm_coef <-
           # cd <- assign(resist.names[i], value = inputs$cd)
           
           # Fit model
-          mod <- mlpe_rga(formula = formula,
-                          data = dat,
-                          REML = TRUE,
-                          ZZ = ZZ)
+          mod <- .rga_fit_mlpe(formula = formula,
+                               data = dat,
+                               REML = TRUE,
+                               ZZ = ZZ)
           
           
           #   lFormula(formula,
@@ -302,21 +298,24 @@ MLPE.lmm_coef <-
           ZZ <- ZZ.mat(ID = ID)
           cs.matrix <- scale(mm, center = TRUE, scale = TRUE)
           cs.unscale <- mm
-          dat <- cbind(ID, cs.matrix, response)
+          dat <- data.frame(ID, cs.matrix = cs.matrix, response = response)
+          dat <- .mlpe_attach_workflow_pairs(dat, ID)
+          formula <- .mlpe_formula_from_data(
+            data = dat,
+            response = "response",
+            predictor = "cs.matrix",
+            fallback = response ~ cs.matrix + (1 | pop1)
+          )
           
           # Assign value to layer
           LAYER <- assign(resist.names[i], value = dat$cs.matrix)
           
           # Fit model
-          mod <-
-            lme4::lFormula(response ~ LAYER + (1 | pop1),
-                           data = dat,
-                           REML = TRUE)
-          mod$reTrms$Zt <- ZZ
-          dfun <- do.call(lme4::mkLmerDevfun, mod)
-          opt <- lme4::optimizeLmer(dfun)
-          Mod.Summary <-
-            summary(lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          mod <- .rga_fit_mlpe(formula = formula,
+                               data = dat,
+                               ZZ = ZZ,
+                               REML = TRUE)
+          Mod.Summary <- summary(mod)
           COEF <- Mod.Summary$coefficients
           row.names(COEF) <- c("Intercept", resist.names[i])
           COEF.Table <- rbind(COEF.Table, COEF)
@@ -341,21 +340,24 @@ MLPE.lmm_coef <-
           ZZ <- ZZ.mat(ID = ID)
           cs.matrix <- scale(mm, center = TRUE, scale = TRUE)
           cs.unscale <- mm
-          dat <- cbind(ID, cs.matrix, response)
+          dat <- data.frame(ID, cs.matrix = cs.matrix, response = response)
+          dat <- .mlpe_attach_workflow_pairs(dat, ID)
+          formula <- .mlpe_formula_from_data(
+            data = dat,
+            response = "response",
+            predictor = "cs.matrix",
+            fallback = response ~ cs.matrix + (1 | pop1)
+          )
           
           # Assign value to layer
           LAYER <- assign(resist.names[i], value = dat$cs.matrix)
           
           # Fit model
-          mod <-
-            lme4::lFormula(response ~ LAYER + (1 | pop1),
-                           data = dat,
-                           REML = TRUE)
-          mod$reTrms$Zt <- ZZ
-          dfun <- do.call(lme4::mkLmerDevfun, mod)
-          opt <- lme4::optimizeLmer(dfun)
-          Mod.Summary <-
-            summary(lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          mod <- .rga_fit_mlpe(formula = formula,
+                               data = dat,
+                               ZZ = ZZ,
+                               REML = TRUE)
+          Mod.Summary <- summary(mod)
           COEF <- Mod.Summary$coefficients
           row.names(COEF) <- c("Intercept", resist.names[i])
           COEF.Table <- rbind(COEF.Table, COEF)
@@ -380,21 +382,24 @@ MLPE.lmm_coef <-
           ZZ <- ZZ.mat(ID = ID)
           cs.matrix <- scale(mm, center = TRUE, scale = TRUE)
           cs.unscale <- mm
-          dat <- cbind(ID, cs.matrix, response)
+          dat <- data.frame(ID, cs.matrix = cs.matrix, response = response)
+          dat <- .mlpe_attach_workflow_pairs(dat, ID)
+          formula <- .mlpe_formula_from_data(
+            data = dat,
+            response = "response",
+            predictor = "cs.matrix",
+            fallback = response ~ cs.matrix + (1 | pop1)
+          )
           
           # Assign value to layer
           LAYER <- assign(resist.names[i], value = dat$cs.matrix)
           
           # Fit model
-          mod <-
-            lme4::lFormula(response ~ LAYER + (1 | pop1),
-                           data = dat,
-                           REML = TRUE)
-          mod$reTrms$Zt <- ZZ
-          dfun <- do.call(lme4::mkLmerDevfun, mod)
-          opt <- lme4::optimizeLmer(dfun)
-          Mod.Summary <-
-            summary(lme4::mkMerMod(environment(dfun), opt, mod$reTrms, fr = mod$fr))
+          mod <- .rga_fit_mlpe(formula = formula,
+                               data = dat,
+                               ZZ = ZZ,
+                               REML = TRUE)
+          Mod.Summary <- summary(mod)
           COEF <- Mod.Summary$coefficients
           row.names(COEF) <- c("Intercept", resist.names[i])
           COEF.Table <- rbind(COEF.Table, COEF)

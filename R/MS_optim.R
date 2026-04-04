@@ -288,13 +288,13 @@ MS_optim <- function(gdist.inputs = NULL,
     }
     
     fit.mod <- mlpe_rga(formula = gdist.inputs$formula,
-                        data = dat,
-                        ZZ = gdist.inputs$ZZ,
-                        REML = FALSE)
-    fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
                              data = dat,
                              ZZ = gdist.inputs$ZZ,
-                             REML = TRUE)
+                             REML = FALSE)
+    fit.mod_REML <- mlpe_rga(formula = gdist.inputs$formula,
+                                  data = dat,
+                                  ZZ = gdist.inputs$ZZ,
+                                  REML = TRUE)
     
     fit.stats <- suppressWarnings(r.squaredGLMM(
       fit.mod
@@ -673,13 +673,13 @@ MS_optim <- function(gdist.inputs = NULL,
     # )
     
     fit.mod <- mlpe_rga(formula = jl.inputs$formula,
-                        data = dat,
-                        ZZ = jl.inputs$ZZ,
-                        REML = FALSE)
-    fit.mod_REML <- mlpe_rga(formula = jl.inputs$formula,
                              data = dat,
                              ZZ = jl.inputs$ZZ,
-                             REML = TRUE)
+                             REML = FALSE)
+    fit.mod_REML <- mlpe_rga(formula = jl.inputs$formula,
+                                  data = dat,
+                                  ZZ = jl.inputs$ZZ,
+                                  REML = TRUE)
     
     fit.stats <- suppressWarnings(r.squaredGLMM(
       fit.mod
