@@ -149,6 +149,34 @@ mlpe <- function(formula,
 }
 
 
+.rga_fit_mlpe <- function(formula,
+                          data,
+                          REML = FALSE,
+                          ZZ = NULL,
+                          keep = NULL,
+                          ...) {
+  pair_terms <- attr(data, "mlpe_pairs", exact = TRUE)
+
+  if (is.list(pair_terms) && length(pair_terms) > 0L) {
+    return(
+      mlpe(formula = formula,
+           data = data,
+           pairs = pair_terms,
+           REML = REML,
+           keep = keep,
+           ...)
+    )
+  }
+
+  mlpe_rga(formula = formula,
+           data = data,
+           REML = REML,
+           ZZ = ZZ,
+           keep = keep,
+           ...)
+}
+
+
 .mlpe_attach_workflow_pairs <- function(data, ID) {
   if (is.null(data) || is.null(ID)) {
     return(data)
@@ -526,8 +554,19 @@ mlpe <- function(formula,
     }
 
     if (!identical(sort(existing_levels), sort(levels_nm))) {
-      data[[nm]] <- factor(rep(levels_nm, length.out = nrow(data)),
-                           levels = levels_nm)
+      placeholder_values <- rep(levels_nm, length.out = nrow(data))
+      first_endpoint <- as.character(data[[cols[[1]]]])
+
+      # Preserve legacy one-dyad initialization when the first endpoint column
+      # already spans all active levels, but keep the cyclic fallback for
+      # generic mlpe_data() inputs where that is not true.
+      if (all(active) &&
+          all(!is.na(first_endpoint)) &&
+          all(levels_nm %in% first_endpoint)) {
+        placeholder_values <- first_endpoint
+      }
+
+      data[[nm]] <- factor(placeholder_values, levels = levels_nm)
     }
   }
 

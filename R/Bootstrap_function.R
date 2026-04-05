@@ -233,11 +233,20 @@ boot.AICc <- function(response, resistance, ID, ZZ, k, obs, pred.dat, keep = NUL
   resistance <- scale(resistance, center = TRUE, scale = TRUE)
   dat <- data.frame(ID, resistance = resistance, response = response)
   colnames(dat) <- c("pop1", "pop2", "resistance", "response")
+  dat <- .mlpe_attach_workflow_pairs(dat, ID)
+
+  formula <- .mlpe_formula_from_data(
+    data = dat,
+    response = "response",
+    predictor = "resistance",
+    fallback = response ~ resistance + (1 | pop1)
+  )
   
-  fit.mod <- mlpe_rga(response ~ resistance + (1 | pop1),
-                      data = dat,
-                      REML = F,
-                      keep = keep)
+  fit.mod <- .rga_fit_mlpe(formula = formula,
+                           data = dat,
+                           REML = FALSE,
+                           ZZ = ZZ,
+                           keep = keep)
   
   R.sq <- MuMIn::r.squaredGLMM(fit.mod)[[1]]
   LL <- logLik(fit.mod)
