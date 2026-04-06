@@ -1,3 +1,8 @@
+ResistanceGA2 1.1.12
+---------
+* Made the Julia_Guide vignette detect Julia automatically so vignette rebuilds do not fail on systems without a local Julia installation
+* Restored normal vignette builds in the GitHub Actions package-check workflow
+
 ResistanceGA2 1.1.11
 ---------
 * Excluded GitHub workflow files from built package contents and aligned CI package checks with the standard no-vignette pre-check workflow
