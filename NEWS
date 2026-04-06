@@ -1,3 +1,11 @@
+ResistanceGA2 1.1.11
+---------
+* Excluded GitHub workflow files from built package contents and aligned CI package checks with the standard no-vignette pre-check workflow
+
+ResistanceGA2 1.1.10
+---------
+* Updated the GitHub Actions package-check workflow to skip vignette builds on CI runners
+
 ResistanceGA2 1.1.9
 ---------
 * Updated package examples and vignettes to use packed-raster-safe resistance surface handling

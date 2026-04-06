@@ -1,6 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.claude$
+^\.github$
 ^AGENTS\.md$
 ^Rplots\.pdf$
 ^data-raw$
