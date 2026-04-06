@@ -1,3 +1,7 @@
+ResistanceGA2 1.1.13
+---------
+* Made the Julia_Guide connection-verification chunks display-only so vignette rebuilds do not depend on starting Julia during package checks
+
 ResistanceGA2 1.1.12
 ---------
 * Made the Julia_Guide vignette detect Julia automatically so vignette rebuilds do not fail on systems without a local Julia installation

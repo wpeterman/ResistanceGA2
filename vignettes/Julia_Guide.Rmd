@@ -170,21 +170,21 @@ if (nzchar(julia_exe)) {
 
 After setting `JULIA_BINDIR`, verify that R can start Julia and load Circuitscape:
 
-```{r verify-julia, eval=has_julia}
+```{r verify-julia, eval=FALSE}
 Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 
 # This triggers Julia startup on first call
 JuliaConnectoR::juliaEval("string(VERSION)")
 ```
 
-```{r verify-circuitscape, eval=has_julia}
+```{r verify-circuitscape, eval=FALSE}
 # Confirm Circuitscape is available
 JuliaConnectoR::juliaEval("using Circuitscape")
 ```
 
-If Julia is not installed on the machine rendering this vignette, the code blocks
-above are still shown but are not executed. In that case, run them manually after
-setting `JULIA_BINDIR` on your own system.
+These verification chunks are shown for copy-paste use but are not executed during
+vignette builds. Run them manually in your own R session after setting
+`JULIA_BINDIR`.
 
 If both commands succeed without error, your Julia/Circuitscape setup is ready for `ResistanceGA2`.
 
