@@ -59,10 +59,16 @@ This process repeats until the population converges or a stopping criterion is m
 Standard regression models cannot be applied directly to pairwise genetic and landscape distance data because observations sharing a common sampling location are not independent (any pair involving population A is correlated with any other pair involving population A). The MLPE model (Clarke et al. 2002) handles this by including a random effect structured to absorb that dependency:
 
 ```
-genetic_distance ~ resistance_distance + (1 | pop)
+genetic_distance ~ resistance_distance + (1 | pair)
 ```
 
-The dyadic random effect `(1 | pop)` is a structural component of MLPE. It is constructed automatically from the endpoint columns in the pairwise data. Users do not need to build a `ZZ` matrix or call `To.From.ID()` directly when using the main optimization functions or the new MLPE interface.
+In the standalone `mlpe()` interface, the dyadic random effect is declared as a
+named term such as `(1 | pair)` and constructed automatically from the endpoint
+columns in the pairwise data. Inside the optimization workflow, the package
+still builds the legacy internal `pop`/`grp` terms behind the scenes so
+existing result objects and helper functions continue to work. Users do not
+need to build a `ZZ` matrix or call `To.From.ID()` directly when using the main
+optimization functions or the modern MLPE interface.
 
 `ResistanceGA2` provides a dyad-aware interface for fitting MLPE models directly:
 

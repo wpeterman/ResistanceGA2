@@ -1,6 +1,6 @@
 Package: ResistanceGA2
 Title: Optimize Resistance Surfaces Using Genetic Algorithms
-Version: 1.1.8
+Version: 1.1.9
 Authors@R: person(given = "Bill", family = "Peterman", role = c("aut", "cre"), email = "peterman.73@osu.edu")
 Description: Provides functions to optimize resistance surfaces using
     Genetic Algorithms. Continuous and categorical surfaces can be
