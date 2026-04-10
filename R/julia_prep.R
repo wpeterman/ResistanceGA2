@@ -199,8 +199,13 @@ jl.prep <- function(n.Pops,
     temp.ini  <- tempfile(pattern = "", tmpdir = td, fileext = ".ini")
     tmp.name  <- sub("\\.ini$", "", basename(temp.ini))
 
+    test_surface <- ResistanceGA2::resistance_surfaces
+    if (inherits(test_surface, "PackedSpatRaster")) {
+      test_surface <- terra::unwrap(test_surface)
+    }
+
     terra::writeRaster(
-      x         = ResistanceGA2::resistance_surfaces[["continuous"]],
+      x         = terra::subset(test_surface, "continuous"),
       filename  = paste0(td, tmp.name, ".asc"),
       overwrite = TRUE
     )

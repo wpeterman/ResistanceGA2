@@ -1,3 +1,26 @@
+ResistanceGA2 1.1.13
+---------
+* Made the Julia_Guide connection-verification chunks display-only so vignette rebuilds do not depend on starting Julia during package checks
+
+ResistanceGA2 1.1.12
+---------
+* Made the Julia_Guide vignette detect Julia automatically so vignette rebuilds do not fail on systems without a local Julia installation
+* Restored normal vignette builds in the GitHub Actions package-check workflow
+
+ResistanceGA2 1.1.11
+---------
+* Excluded GitHub workflow files from built package contents and aligned CI package checks with the standard no-vignette pre-check workflow
+
+ResistanceGA2 1.1.10
+---------
+* Updated the GitHub Actions package-check workflow to skip vignette builds on CI runners
+
+ResistanceGA2 1.1.9
+---------
+* Updated package examples and vignettes to use packed-raster-safe resistance surface handling
+* Fixed jl.prep's internal Julia test raster export to work with the current bundled surfaces
+* Added a GitHub Actions workflow that runs package checks on substantive pushes and pull requests
+
 ResistanceGA2 1.1.8
 ---------
 * Routed bootstrap, diagnostic, and legacy coefficient MLPE fits through the dyad-aware fitting backend

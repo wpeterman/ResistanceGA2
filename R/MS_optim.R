@@ -35,7 +35,7 @@
 #'
 #' ms.out <- MS_optim(
 #'   gdist.inputs = gdist.inputs,
-#'   GA.inputs = GA.worker.inputs,
+#'   GA.inputs = GA.inputs,
 #'   diagnostic_plots = FALSE
 #' )
 #' }

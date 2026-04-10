@@ -181,8 +181,9 @@ NULL
 #'
 #' \itemize{
 #'   \item gdistance_commute. Full square commute-distance matrix returned by
-#'     \code{\link{Run_gdistance}} for
-#'     \code{resistance_surfaces[["continuous"]]} and \code{samples}.
+#'     \code{\link{Run_gdistance}} for the \code{"continuous"} layer of
+#'     \code{\link{resistance_surfaces}} (after \code{terra::unwrap()} when
+#'     needed) and \code{samples}.
 #'   \item circuitscape_matrix. Lower-half pairwise resistance vector returned
 #'     by \code{\link{Run_CS.jl}} for the same surface and sample locations.
 #' }
@@ -197,8 +198,9 @@ NULL
 #' Data file. Precomputed Circuitscape current map used in vignette examples
 #'
 #' A \code{SpatRaster} cumulative current map produced by
-#' \code{\link{Run_CS.jl}} for \code{resistance_surfaces[["continuous"]]} and
-#' \code{samples}.
+#' \code{\link{Run_CS.jl}} for the \code{"continuous"} layer of
+#' \code{\link{resistance_surfaces}} (after \code{terra::unwrap()} when
+#' needed) and \code{samples}.
 #'
 #' @docType data
 #' @name vignette_current_map

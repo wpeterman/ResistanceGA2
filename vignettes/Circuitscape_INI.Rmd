@@ -22,6 +22,13 @@ library(ResistanceGA2)
 library(terra)
 ```
 
+```{r surfaces}
+surfaces <- resistance_surfaces
+if (inherits(surfaces, "PackedSpatRaster")) {
+  surfaces <- terra::unwrap(surfaces)
+}
+```
+
 # Overview
 
 `Run_CS.ini()` is a low-level Circuitscape wrapper for cases where you want to
@@ -55,7 +62,7 @@ Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 
 ```{r example-inputs}
 pts <- vect(samples[, 2:3], type = "points")
-surface <- resistance_surfaces[["continuous"]]
+surface <- terra::subset(surfaces, "continuous")
 
 pts
 surface
@@ -172,7 +179,7 @@ reclass_tbl <- data.frame(
 )
 
 reclass_out <- Run_CS.ini(
-  r = resistance_surfaces[["categorical"]],
+  r = terra::subset(surfaces, "categorical"),
   CS_Point.File = pts,
   JULIA_HOME = JULIA_HOME,
   reclass_file = reclass_tbl,

@@ -28,6 +28,11 @@ knitr::opts_chunk$set(
 library(ResistanceGA2)
 library(terra)
 library(ggplot2)
+
+surfaces <- resistance_surfaces
+if (inherits(surfaces, "PackedSpatRaster")) {
+  surfaces <- terra::unwrap(surfaces)
+}
 ```
 
 ---
@@ -386,7 +391,7 @@ ga_inputs <- GA.prep(
 
 # For two continuous layers: Monomolecular only for both
 ga_inputs_2 <- GA.prep(
-  raster       = resistance_surfaces[[c("continuous", "feature")]],
+  raster       = terra::subset(surfaces, c("continuous", "feature")),
   Results.dir  = file.path(tempdir(), "rga2-mono-2"),
   select.trans = list("M", "M")
 )
@@ -410,7 +415,7 @@ ga_inputs_all <- GA.prep(
 
 # Monomolecular for one layer, all families for another
 ga_inputs_mixed <- GA.prep(
-  raster       = resistance_surfaces[[c("continuous", "feature")]],
+  raster       = terra::subset(surfaces, c("continuous", "feature")),
   Results.dir  = file.path(tempdir(), "rga2-mixed"),
   select.trans = list("M", "A")
 )
@@ -431,7 +436,7 @@ The default behavior detects layer type automatically and applies `"M"` for cont
 
 ```{r select-trans-inspect}
 ga_inputs_check <- GA.prep(
-  raster      = resistance_surfaces[[c("categorical", "continuous")]],
+  raster      = terra::subset(surfaces, c("categorical", "continuous")),
   Results.dir = file.path(tempdir(), "rga2-check"),
   monitor     = FALSE,
   quiet       = TRUE

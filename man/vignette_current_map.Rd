@@ -12,7 +12,8 @@ data(vignette_current_map)
 }
 \description{
 A \code{SpatRaster} cumulative current map produced by
-\code{\link{Run_CS.jl}} for \code{resistance_surfaces[["continuous"]]} and
-\code{samples}.
+\code{\link{Run_CS.jl}} for the \code{"continuous"} layer of
+\code{\link{resistance_surfaces}} (after \code{terra::unwrap()} when
+needed) and \code{samples}.
 }
 \keyword{datasets}

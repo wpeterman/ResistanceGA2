@@ -14,6 +14,25 @@ vignette: |
 ---
 
 ```{r setup, include=FALSE}
+julia_bindir <- Sys.getenv("JULIA_BINDIR", unset = "")
+
+if (!nzchar(julia_bindir)) {
+  julia_exe <- Sys.which("julia")
+  if (nzchar(julia_exe)) {
+    julia_bindir <- dirname(julia_exe)
+  }
+}
+
+julia_candidates <- file.path(julia_bindir, c("julia", "julia.exe"))
+has_julia <- nzchar(julia_bindir) && any(file.exists(julia_candidates))
+
+if (has_julia) {
+  JULIA_HOME <- normalizePath(julia_bindir, winslash = "/", mustWork = TRUE)
+  Sys.setenv(JULIA_BINDIR = JULIA_HOME)
+} else {
+  JULIA_HOME <- "C:/Users/your-name/AppData/Local/Programs/Julia-1.11.4/bin/"
+}
+
 knitr::opts_chunk$set(
   collapse  = TRUE,
   comment   = "#>",
@@ -117,8 +136,8 @@ Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 ```
 
 ```{r julia-home-run, include=FALSE}
-JULIA_HOME <- "C:/Users/peterman.73/AppData/Local/Programs/Julia-1.11.4/bin/"
-Sys.setenv(JULIA_BINDIR = JULIA_HOME)
+# JULIA_HOME is initialized in the setup chunk. When Julia is not available
+# during vignette rendering, it falls back to an example path for display only.
 ```
 
 To avoid setting this every session, add the `Sys.setenv()` line to your `.Rprofile`:
@@ -151,17 +170,21 @@ if (nzchar(julia_exe)) {
 
 After setting `JULIA_BINDIR`, verify that R can start Julia and load Circuitscape:
 
-```{r verify-julia, eval=TRUE}
+```{r verify-julia, eval=FALSE}
 Sys.setenv(JULIA_BINDIR = JULIA_HOME)
 
 # This triggers Julia startup on first call
 JuliaConnectoR::juliaEval("string(VERSION)")
 ```
 
-```{r verify-circuitscape, eval=TRUE}
+```{r verify-circuitscape, eval=FALSE}
 # Confirm Circuitscape is available
 JuliaConnectoR::juliaEval("using Circuitscape")
 ```
+
+These verification chunks are shown for copy-paste use but are not executed during
+vignette builds. Run them manually in your own R session after setting
+`JULIA_BINDIR`.
 
 If both commands succeed without error, your Julia/Circuitscape setup is ready for `ResistanceGA2`.
 

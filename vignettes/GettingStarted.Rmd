@@ -25,6 +25,11 @@ knitr::opts_chunk$set(
 ```{r libraries, message=FALSE, warning=FALSE}
 library(ResistanceGA2)
 library(terra)
+
+surfaces <- resistance_surfaces
+if (inherits(surfaces, "PackedSpatRaster")) {
+  surfaces <- terra::unwrap(surfaces)
+}
 ```
 
 ---
@@ -70,7 +75,7 @@ These three hypotheses are not mutually exclusive. In many systems, genetic stru
   +----------------------------------------------+
   |  MLPE model                                   |
   |  genetic distance ~ resistance distance       |
-  |           + (1 | pop)                         |
+  |           + dyadic random intercept           |
   +----------------------------------------------+
          |  log-likelihood (objective)
          v
@@ -85,6 +90,11 @@ These three hypotheses are not mutually exclusive. In many systems, genetic stru
 ```
 
 The genetic algorithm (GA) is the engine that drives the search. At each generation, a population of candidate parameter sets is evaluated: each candidate defines a specific transformation of the input raster, a distance matrix is calculated, an MLPE model is fit, and the objective function (default: log-likelihood) is returned. The GA then selects, recombines, and mutates the best candidates to produce the next generation, repeating until convergence.
+
+Inside the optimization workflow, `ResistanceGA2` still prepares the legacy
+`pop`/`grp` random-effect terms needed for the package internals. For standalone
+analysis, however, the recommended interface is the dyad-aware
+`mlpe_data()`/`mlpe()` workflow shown in the `IBE_IBR_Framework` vignette.
 
 ---
 
@@ -124,7 +134,7 @@ resistance_surfaces
 - **`feature`**: a binary or near-binary surface representing a linear landscape feature (e.g., a road or river).
 
 ```{r plot-surfaces, fig.cap="The three bundled resistance surface layers. Categorical (left) has discrete class values. Continuous (center) varies smoothly. Feature (right) represents a linear landscape element."}
-plot(resistance_surfaces, main = c("Categorical", "Continuous", "Feature"))
+plot(surfaces, main = c("Categorical", "Continuous", "Feature"))
 ```
 
 ## Sample Locations
@@ -142,7 +152,7 @@ pts_large
 `samples` contains 25 sampling locations as a matrix with x/y coordinates. `sample_pops` is a list of coordinate matrices representing multiple replicate populations; `Dc_list` contains corresponding genetic distance matrices.
 
 ```{r plot-locations, fig.cap="Sample locations overlaid on the continuous resistance surface. The 25-point small dataset (filled circles) is useful for quick examples."}
-plot(resistance_surfaces[["continuous"]], main = "Sample locations")
+plot(terra::subset(surfaces, "continuous"), main = "Sample locations")
 points(pts_small, pch = 19, col = "white", cex = 0.9)
 points(pts_small, pch = 1,  col = "black", cex = 0.9)
 ```
@@ -189,7 +199,7 @@ Every analysis in `ResistanceGA2` follows the same four-step structure, regardle
 
 ```{r ga-prep, message=FALSE, warning=FALSE}
 ga_inputs <- GA.prep(
-  raster      = resistance_surfaces[[c("categorical", "continuous")]],
+  raster      = terra::subset(surfaces, c("categorical", "continuous")),
   Results.dir = file.path(tempdir(), "ResistanceGA2-getting-started"),
   monitor     = FALSE,
   quiet       = TRUE
@@ -339,7 +349,7 @@ Before running a full optimization, it is useful to explore how the transformati
 ```{r plot-trans, fig.cap="A Monomolecular transformation applied to the continuous resistance surface. Low values in the original raster receive low resistance; the curve saturates at high values."}
 Plot.trans(
   PARM           = c(2.5, 100),
-  Resistance     = resistance_surfaces[["continuous"]],
+  Resistance     = terra::subset(surfaces, "continuous"),
   transformation = "Monomolecular",
   marginal.plot  = FALSE
 )
@@ -352,7 +362,7 @@ transformed <- Resistance.tran(
   transformation = "Monomolecular",
   shape          = 2.5,
   max            = 100,
-  r              = resistance_surfaces[["continuous"]]
+  r              = terra::subset(surfaces, "continuous")
 )
 transformed
 ```
