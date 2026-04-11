@@ -23,8 +23,24 @@ test_that("gdist.prep returns list with all expected names", {
   )
   expected <- c("response", "samples", "covariates", "formula",
                 "transitionFunction", "directions", "ID", "ZZ",
-                "keep", "n.Pops", "longlat", "method", "df")
+                "keep", "n.Pops", "longlat", "method",
+                "commute.approx", "approx.factor", "approx.scale", "df")
   expect_named(out, expected)
+})
+
+test_that("gdist.prep stores commute approximation settings", {
+  coords <- make_points(8)
+  out <- gdist.prep(
+    n.Pops = 8,
+    samples = coords,
+    commute.approx = "aggregate",
+    approx.factor = 3L,
+    approx.scale = FALSE
+  )
+
+  expect_identical(out$commute.approx, "aggregate")
+  expect_identical(out$approx.factor, 3L)
+  expect_false(out$approx.scale)
 })
 
 test_that("gdist.prep stores samples as matrix", {

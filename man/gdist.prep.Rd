@@ -15,7 +15,10 @@ gdist.prep(
   longlat = FALSE,
   method = "commuteDistance",
   min.max_dist = NULL,
-  keep = NULL
+  keep = NULL,
+  commute.approx = c("none", "aggregate"),
+  approx.factor = 4L,
+  approx.scale = TRUE
 )
 }
 \arguments{
@@ -58,6 +61,18 @@ comparisons. Pairs outside this range are omitted.}
 number of pairwise observations, with 1 to keep an observation and 0 to
 drop it. Can be used in conjunction with, or in place of,
 \code{min.max_dist}.}
+
+\item{commute.approx}{Approximation backend for iterative
+\code{commuteDistance} optimization runs. \code{"none"} (default) keeps
+exact \pkg{gdistance} output. \code{"aggregate"} first coarsens the
+resistance raster before calculating commute distances.}
+
+\item{approx.factor}{Integer aggregation factor used when
+\code{commute.approx = "aggregate"}. Default = 4.}
+
+\item{approx.scale}{Logical. If \code{TRUE}, multiply aggregate
+approximation distances by \code{approx.factor^2} to keep values closer to
+the full-resolution scale. Default = \code{TRUE}.}
 }
 \value{
 A named list of inputs required by the optimization functions.

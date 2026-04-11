@@ -32,6 +32,15 @@
 #'   number of pairwise observations, with 1 to keep an observation and 0 to
 #'   drop it. Can be used in conjunction with, or in place of,
 #'   \code{min.max_dist}.
+#' @param commute.approx Approximation backend for iterative
+#'   \code{commuteDistance} optimization runs. \code{"none"} (default) keeps
+#'   exact \pkg{gdistance} output. \code{"aggregate"} first coarsens the
+#'   resistance raster before calculating commute distances.
+#' @param approx.factor Integer aggregation factor used when
+#'   \code{commute.approx = "aggregate"}. Default = 4.
+#' @param approx.scale Logical. If \code{TRUE}, multiply aggregate
+#'   approximation distances by \code{approx.factor^2} to keep values closer to
+#'   the full-resolution scale. Default = \code{TRUE}.
 #'
 #' @return A named list of inputs required by the optimization functions.
 #'
@@ -66,10 +75,18 @@ gdist.prep <-
            longlat = FALSE,
            method = 'commuteDistance',
            min.max_dist = NULL,
-           keep = NULL) {
+           keep = NULL,
+           commute.approx = c("none", "aggregate"),
+           approx.factor = 4L,
+           approx.scale = TRUE) {
 
     if (method != 'commuteDistance') {
       method <- 'costDistance'
+    }
+    commute.approx <- match.arg(commute.approx)
+    approx.factor <- as.integer(approx.factor)
+    if (length(approx.factor) != 1L || is.na(approx.factor) || approx.factor < 1L) {
+      stop("'approx.factor' must be a single positive integer.")
     }
 
     if (!is.null(response)) {
@@ -149,6 +166,9 @@ gdist.prep <-
       n.Pops             = n.Pops,
       longlat            = longlat,
       method             = method,
+      commute.approx     = commute.approx,
+      approx.factor      = approx.factor,
+      approx.scale       = isTRUE(approx.scale),
       df                 = df
     )
 

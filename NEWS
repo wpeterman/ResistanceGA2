@@ -1,3 +1,14 @@
+ResistanceGA2 1.1.14
+---------
+* Optimized gdistance commute runs with batched sparse solves and selected-pair gdistance runs by reusing endpoint distance calculations
+* Added a vectorized sparse transition builder for the default gdistance transition function on projected 4- and 8-neighbor rasters
+* Added a vectorized projected-raster geographic correction path for gdistance transition matrices
+* Tuned the sparse Cholesky strategy used by fast gdistance commute-distance solves on large rasters
+* Reduced peak memory and solve time for exact gdistance commute-distance runs by solving endpoint right-hand sides in blocks
+* Cached projected-raster gdistance transition geometry across repeated calls with identical raster geometry and directions
+* Added an opt-in aggregate approximation for iterative gdistance commute-distance optimization runs
+* Added benchmark scripts comparing optimized gdistance commute runs with Julia/Circuitscape and aggregate approximations
+
 ResistanceGA2 1.1.13
 ---------
 * Made the Julia_Guide connection-verification chunks display-only so vignette rebuilds do not depend on starting Julia during package checks
