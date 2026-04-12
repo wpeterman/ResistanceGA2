@@ -32,6 +32,10 @@ library(ggplot2)
 
 ---
 
+> **Migrating from ResistanceGA?** See the *Key Changes from ResistanceGA* section in the `GettingStarted` vignette for a complete list of breaking changes, removed functions, and new features.
+
+---
+
 # Background
 
 ## Resistance Modeling in Landscape Genetics
