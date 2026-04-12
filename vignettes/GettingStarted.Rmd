@@ -34,6 +34,45 @@ if (inherits(surfaces, "PackedSpatRaster")) {
 
 ---
 
+# Key Changes from ResistanceGA
+
+`ResistanceGA2` is a major revision. If you are migrating scripts from the original `ResistanceGA` package, the summary below covers every breaking change.
+
+## Spatial classes: terra only
+
+All spatial inputs must now use the `terra` package. There is no fallback to `raster` or `sp` classes.
+
+| Old | New |
+|-----|-----|
+| `RasterLayer`, `RasterStack` | `SpatRaster` — use `terra::rast()` |
+| `SpatialPoints`, `SpatialPointsDataFrame` | `SpatVector` — use `terra::vect()` |
+| `raster::stack()`, `dropLayer()` | `terra::rast()`, `terra::subset()` |
+
+Bundled package datasets (`resistance_surfaces`, `raster_orig`, etc.) are stored as wrapped `SpatRaster` objects and unwrapped automatically when the package loads — no manual conversion needed.
+
+## Removed features
+
+| Removed | Replacement |
+|---------|-------------|
+| `CS.prep()`, `Run_CS()` | `jl.prep()`, `Run_CS.jl()` — Julia/Circuitscape only |
+| `JuliaCall` dependency | `JuliaConnectoR` |
+| Standalone Circuitscape `.exe` | Julia + Circuitscape.jl |
+| `Grid.Search()` | No equivalent — use GA with restricted families |
+| `k.smooth` parameter | Removed; use `select.trans` in `GA.prep()` |
+| `SS_optim.scale()`, `MS_optim.scale()` | Merged into `SS_optim()`, `MS_optim()` |
+
+## New features in ResistanceGA2
+
+- **Conditional IBR optimization**: `gdist.prep()` and `jl.prep()` accept `covariates` and `formula` arguments to condition resistance search on IBD or IBE fixed effects.
+- **`mlpe()` and `mlpe_data()`**: New dyad-aware interface for fitting MLPE models directly, with `lme4`-style formula syntax.
+- **`site_pairwise_diff()` / `site_pairwise_dist()`**: Helper functions for constructing pairwise IBE covariates from site-level environmental measurements.
+- **S3 methods on results**: `SS_optim()`, `MS_optim()`, and `all_comb()` return objects with `print()`, `summary()`, and `plot()` methods.
+- **`Run_CS.ini()`**: Low-level Circuitscape `.ini` wrapper for advanced scenarios (source/ground mode, mask files, included-pairs files).
+- **Idaho demo data**: `rga2_demo` and `rga2_demo_covariates` for the `IBE_IBR_Framework` vignette.
+- **Parallel improvements**: `SpatRaster` objects are serialized via `terra::wrap()` before being dispatched to parallel workers, fixing Windows-specific crashes.
+
+---
+
 # What Is ResistanceGA2?
 
 Landscape genetics asks how the physical environment shapes the movement of individuals; and by extension, how genes flow across the landscape. Two populations might be far apart in straight-line geographic distance, but if a highway, a mountain range, or a patch of inhospitable habitat lies between them, their genetic exchange may be far lower than geography alone would predict.

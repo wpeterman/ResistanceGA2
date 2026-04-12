@@ -4,7 +4,15 @@
 \alias{Run_gdistance}
 \title{Run gdistance cost/commute distance calculation}
 \usage{
-Run_gdistance(gdist.inputs, r, scl = TRUE, return.error.value = FALSE)
+Run_gdistance(
+  gdist.inputs,
+  r,
+  scl = TRUE,
+  return.error.value = FALSE,
+  commute.approx = NULL,
+  approx.factor = NULL,
+  approx.scale = NULL
+)
 }
 \arguments{
 \item{gdist.inputs}{Object created by \code{\link[ResistanceGA2]{gdist.prep}}.}
@@ -21,6 +29,18 @@ warnings/errors instead of throwing an error. This is intended for
 internal GA fitness evaluation, where failed candidate surfaces should be
 penalized but optimization should continue. Default is \code{FALSE} for
 user-facing calls.}
+
+\item{commute.approx}{Optional override for the commute-distance
+approximation stored in \code{gdist.inputs}. \code{NULL} uses the setting
+from \code{\link{gdist.prep}}. \code{"none"} runs the exact gdistance
+commute solve; \code{"aggregate"} coarsens \code{r} first for faster
+iterative optimization.}
+
+\item{approx.factor}{Optional integer aggregation factor override used when
+\code{commute.approx = "aggregate"}.}
+
+\item{approx.scale}{Optional logical override. If \code{TRUE}, aggregate
+approximation distances are multiplied by \code{approx.factor^2}.}
 }
 \value{
 A numeric distance vector (or matrix) of pairwise cost/commute
@@ -34,7 +54,12 @@ using the \code{gdistance} package.
 \details{
 \pkg{gdistance} still operates on \pkg{raster} objects. This function keeps
 the public API terra-based by coercing the supplied \code{SpatRaster}
-internally before building the transition object.
+internally before building the transition object. The default transition
+function uses vectorized sparse builders for projected 4- and 8-neighbor
+transition matrices and projected geographic corrections. Selected-pair runs
+reuse a single distance calculation over the required endpoints.
+Commute-distance runs solve the reduced Laplacian for all requested endpoints
+in one batch.
 }
 \examples{
 pts <- terra::vect(samples[, 2:3], type = "points")

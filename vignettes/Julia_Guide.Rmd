@@ -117,7 +117,9 @@ The installation will download Circuitscape and its dependencies. The test suite
 
 ## Installing JuliaConnectoR
 
-Install the `JuliaConnectoR` R package, which provides the bridge between R and Julia:
+`ResistanceGA2` uses `JuliaConnectoR` as its R-to-Julia bridge. This replaces the `JuliaCall` package used in the original `ResistanceGA`. If your scripts call `JuliaCall` functions directly, update them to the `JuliaConnectoR` equivalents.
+
+Install the `JuliaConnectoR` R package:
 
 ```{r install-juliaconnector, eval=FALSE}
 install.packages("JuliaConnectoR")
@@ -395,6 +397,8 @@ ms_out <- MS_optim(
   diagnostic_plots = FALSE
 )
 ```
+
+> **Note:** During optimization, `ResistanceGA2` automatically suppresses the verbose `@info` and `@warn` output that Circuitscape.jl prints to the console. You will not see per-call messages from Julia during `SS_optim()`, `MS_optim()`, or `all_comb()` runs. Set `silent = TRUE` in `jl.prep()` to also suppress Julia startup messages during the initial connection test.
 
 > **Tip:** During optimization, `ResistanceGA2` calls `Run_CS.jl()` hundreds or thousands of times (once per candidate solution per generation). Julia's startup overhead is paid only once when `JuliaConnectoR` first connects; subsequent calls are much faster. However, file I/O for the intermediate Circuitscape inputs and outputs still occurs each call. Setting `rm.files = TRUE` (the default) keeps the temporary directory clean and avoids accumulating large numbers of files.
 

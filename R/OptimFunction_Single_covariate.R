@@ -44,7 +44,12 @@ Resistance.Opt_single.cov <-
 
     method       <- GA.inputs$method
     select.trans <- GA.inputs$select.trans
-    r            <- materialize_raster(Resistance)
+    r            <- Resistance
+    if (!is.null(gdist.inputs) &&
+        !is.null(GA.inputs$gdistance.approx.Resistance.stack)) {
+      r <- materialize_raster(GA.inputs$gdistance.approx.Resistance.stack)[[iter]]
+    }
+    r            <- materialize_raster(r)
     keep         <- 1L
 
     # Categorical surface -------------------------------------------------------
@@ -106,7 +111,24 @@ Resistance.Opt_single.cov <-
           obj.func.opt <- -99999
         } else {
           cd <- try(
-            Run_gdistance(gdist.inputs, r, return.error.value = TRUE),
+            {
+              out <- Run_gdistance(
+                gdist.inputs,
+                r,
+                return.error.value = TRUE,
+                commute.approx = if (!is.null(GA.inputs$gdistance.approx.Resistance.stack)) {
+                  "none"
+                } else {
+                  NULL
+                }
+              )
+              if (!identical(out, -99999) &&
+                  !is.null(GA.inputs$gdistance.approx.Resistance.stack) &&
+                  isTRUE(GA.inputs$gdistance.approx.scale)) {
+                out <- out * (GA.inputs$gdistance.approx.factor^2)
+              }
+              out
+            },
             silent = TRUE
           )
 

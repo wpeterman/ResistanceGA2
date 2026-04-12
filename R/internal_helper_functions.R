@@ -273,7 +273,7 @@ Resistance.Opt_AICc <-
     }
     
     if (!is.null(gdist.inputs)) {
-      cd <- Run_gdistance(gdist.inputs, r)
+      cd <- .rga_run_gdistance_exact(gdist.inputs, r)
       
       AIC.stat <- suppressWarnings(AIC(
         MLPE.lmm2(

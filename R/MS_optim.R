@@ -46,6 +46,9 @@ MS_optim <- function(gdist.inputs = NULL,
                      diagnostic_plots = TRUE) {
   k.value <- GA.inputs$k.value
   GA.worker.inputs <- .rga_prepare_parallel_inputs(GA.inputs)
+  GA.gdistance.worker.inputs <- .rga_prepare_parallel_inputs(
+    .rga_prepare_gdistance_optimization_inputs(GA.inputs, gdist.inputs)
+  )
   wd <- getwd()
 
   # gdistance ---------------------------------------------------------------
@@ -69,7 +72,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.worker.inputs,
+          GA.inputs = GA.gdistance.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -104,7 +107,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.worker.inputs,
+          GA.inputs = GA.gdistance.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -141,7 +144,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.worker.inputs,
+          GA.inputs = GA.gdistance.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -176,7 +179,7 @@ MS_optim <- function(gdist.inputs = NULL,
           crossover = GA.inputs$crossover,
           pmutation = GA.inputs$pmutation,
           Min.Max = GA.inputs$Min.Max,
-          GA.inputs = GA.worker.inputs,
+          GA.inputs = GA.gdistance.worker.inputs,
           gdist.inputs = gdist.inputs,
           lower = GA.inputs$ga.min,
           upper = GA.inputs$ga.max,
@@ -244,7 +247,7 @@ MS_optim <- function(gdist.inputs = NULL,
     
     NAME <- paste(GA.inputs$parm.type$name, collapse = ".")
     names(RAST) <- NAME
-    cd <- Run_gdistance(gdist.inputs, RAST)
+    cd <- .rga_run_gdistance_exact(gdist.inputs, RAST)
     dat <- gdist.inputs$df
     dat$cd <- scale(c(cd))
     
