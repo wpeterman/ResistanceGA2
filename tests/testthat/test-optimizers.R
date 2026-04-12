@@ -189,6 +189,7 @@ test_that("Resistance.Opt_single returns finite objective for categorical surfac
   df <- data.frame(id = terra::unique(fixture$categorical)[[1]], parm = parm)
   target_surface <- terra::subst(fixture$categorical, from = df$id, to = df$parm)
   response <- ResistanceGA2::Run_gdistance(fixture$base_gdist, target_surface)
+  response <- response + seq_along(response) * 1e-4
   gdist_inputs <- make_optimizer_inputs(response, fixture)
 
   obj <- ResistanceGA2:::Resistance.Opt_single(
