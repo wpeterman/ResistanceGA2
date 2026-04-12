@@ -1,3 +1,8 @@
+ResistanceGA2 1.1.15
+---------
+* Pre-aggregated resistance stacks for opt-in aggregate gdistance commute-distance GA fitness evaluation while keeping final reported gdistance distances exact
+* Added focused helper-level tests for approximate gdistance optimization setup without running full GA searches
+
 ResistanceGA2 1.1.14
 ---------
 * Optimized gdistance commute runs with batched sparse solves and selected-pair gdistance runs by reusing endpoint distance calculations

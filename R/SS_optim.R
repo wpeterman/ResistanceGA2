@@ -71,7 +71,9 @@ SS_optim <- function(gdist.inputs = NULL,
   cnt1 <- 0
   cnt2 <- 0
   k.value <- GA.inputs$k.value
-  GA.worker.inputs <- .rga_prepare_parallel_inputs(GA.inputs)
+  GA.worker.inputs <- .rga_prepare_parallel_inputs(
+    .rga_prepare_gdistance_optimization_inputs(GA.inputs, gdist.inputs)
+  )
   MLPE.list <- list()
   cd.list <- list()
   k.list <- list()
@@ -154,7 +156,7 @@ SS_optim <- function(gdist.inputs = NULL,
             NAME <- GA.inputs$layer.names[i]
             names(r) <- NAME
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -372,7 +374,7 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- GA.inputs$layer.names[i]
             NAME <- GA.inputs$layer.names[i]
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -559,7 +561,7 @@ SS_optim <- function(gdist.inputs = NULL,
             NAME <- GA.inputs$layer.names[i]
             names(r) <- NAME
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -781,7 +783,7 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- GA.inputs$layer.names[i]
             NAME <- GA.inputs$layer.names[i]
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -945,7 +947,7 @@ SS_optim <- function(gdist.inputs = NULL,
         if (dist_mod == TRUE) {
           rd <- terra::classify(r, matrix(c(-Inf, Inf, 1), ncol = 3))
           names(rd) <- "dist"
-          cd <- Run_gdistance(gdist.inputs, rd)
+          cd <- .rga_run_gdistance_exact(gdist.inputs, rd)
           
           dat <- gdist.inputs$df
           dat$cd <- scale(c(cd))
@@ -1147,7 +1149,7 @@ SS_optim <- function(gdist.inputs = NULL,
             NAME <- GA.inputs$layer.names[i]
             names(r) <- NAME
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -1370,7 +1372,7 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- GA.inputs$layer.names[i]
             NAME <- GA.inputs$layer.names[i]
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -1591,7 +1593,7 @@ SS_optim <- function(gdist.inputs = NULL,
             NAME <- GA.inputs$layer.names[i]
             names(r) <- NAME
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -1812,7 +1814,7 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- GA.inputs$layer.names[i]
             NAME <- GA.inputs$layer.names[i]
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -1977,7 +1979,7 @@ SS_optim <- function(gdist.inputs = NULL,
         if (dist_mod == TRUE) {
           r <- terra::classify(r, matrix(c(-Inf, Inf, 1), ncol = 3))
           names(r) <- "dist"
-          cd <- Run_gdistance(gdist.inputs, r)
+          cd <- .rga_run_gdistance_exact(gdist.inputs, r)
           
           dat <- gdist.inputs$df
           dat$cd <- scale(c(cd))
@@ -2187,7 +2189,7 @@ SS_optim <- function(gdist.inputs = NULL,
             NAME <- GA.inputs$layer.names[i]
             names(r) <- NAME
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             
@@ -2405,7 +2407,7 @@ SS_optim <- function(gdist.inputs = NULL,
             names(r) <- GA.inputs$layer.names[i]
             NAME <- GA.inputs$layer.names[i]
             
-            cd <- Run_gdistance(gdist.inputs, r)
+            cd <- .rga_run_gdistance_exact(gdist.inputs, r)
             dat <- gdist.inputs$df
             dat$cd <- scale(c(cd))
             

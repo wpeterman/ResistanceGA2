@@ -50,5 +50,13 @@
       .rga_wrap_raster_for_parallel(worker.inputs$inputs$raster, TRUE)
   }
 
+  if (!is.null(worker.inputs$gdistance.approx.Resistance.stack)) {
+    worker.inputs$gdistance.approx.Resistance.stack <-
+      .rga_wrap_raster_for_parallel(
+        worker.inputs$gdistance.approx.Resistance.stack,
+        TRUE
+      )
+  }
+
   worker.inputs
 }
